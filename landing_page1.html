@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AADA IoT Connect Hub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --primary:#00ff88; --secondary:#00d4ff; --dark:#0f172a; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',sans-serif; background:linear-gradient(135deg,#0f172a,#16213e); color:white; min-height:100vh; overflow:hidden; }
+    canvas { position:fixed; top:0; left:0; z-index:-1; }
+    .container { padding:2rem; text-align:center; padding-top:15vh; }
+    h1 { font-size:4.5rem; background:linear-gradient(90deg,var(--primary),var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    p { font-size:1.4rem; opacity:0.9; margin:2rem 0; }
+    .btn { padding:1.2rem 3.5rem; font-size:1.4rem; background:linear-gradient(90deg,var(--primary),var(--secondary)); border:none; border-radius:50px; color:black; font-weight:700; cursor:pointer; transition:0.4s; box-shadow:0 15px 40px rgba(0,255,136,0.4); }
+    .btn:hover { transform:translateY(-10px); box-shadow:0 25px 50px rgba(0,255,136,0.6); }
+  </style>
+</head>
+<body>
+  <canvas id="particles"></canvas>
+  <div class="container">
+    <h1>AADA Smart Plug</h1>
+    <p>Secure • Fast • Multi-Device Control</p>
+    <button class="btn" onclick="location.href='profile_page1.html'">Get Started</button>
+  </div>
+  <script>
+    function createParticles() {
+      const canvas = document.getElementById('particles');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+      const particles = [];
+      for(let i=0;i<80;i++){
+        particles.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*4+1,sx:Math.random()*2-1,sy:Math.random()*2-1});
+      }
+      function draw(){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        particles.forEach(p=>{
+          ctx.fillStyle = '#00ff8833';
+          ctx.beginPath();
+          ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+          ctx.fill();
+          p.x += p.sx; p.y += p.sy;
+          if(p.x<0||p.x>canvas.width) p.sx*=-1;
+          if(p.y<0||p.y>canvas.height) p.sy*=-1;
+        });
+        requestAnimationFrame(draw);
+      }
+      draw();
+    }
+    window.onload = createParticles;
+  </script>
+</body>
+</html>

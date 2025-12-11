@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AADA - Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #00ff88;
+      --secondary: #00d4ff;
+      --dark: #0f172a;
+      --card: rgba(15, 23, 42, 0.9);
+      --border: rgba(0, 255, 136, 0.2);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',sans-serif; background:linear-gradient(135deg,#0f172a,#16213e); color:white; min-height:100vh; padding:2rem; }
+    canvas { position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1; }
+    header { text-align:center; margin-bottom:3rem; }
+    h1 { font-size:3.5rem; background:linear-gradient(90deg,var(--primary),var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .add-btn {
+      display:block; margin:2rem auto 0; padding:1.2rem 3rem;
+      background:var(--primary); color:black; border:none; border-radius:50px;
+      font-size:1.4rem; font-weight:700; cursor:pointer; box-shadow:0 10px 30px rgba(0,255,136,0.4);
+      transition:0.3s;
+    }
+    .add-btn:hover { transform:scale(1.05); box-shadow:0 15px 40px rgba(0,255,136,0.6); }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:2rem; }
+    .device-card {
+      background:var(--card); backdrop-filter:blur(20px);
+      padding:2.5rem; border-radius:20px; text-align:center; cursor:pointer;
+      border:2px solid transparent; transition:all 0.4s;
+      box-shadow:0 10px 30px rgba(0,0,0,0.5);
+    }
+    .device-card:hover {
+      transform:translateY(-15px);
+      border-color:var(--primary);
+      box-shadow:0 20px 50px rgba(0,255,136,0.4);
+    }
+    .icon svg { width:80px; height:80px; fill:var(--primary); margin-bottom:1rem; }
+    .status { font-size:1.8rem; font-weight:700; margin-top:1rem; }
+    .on { color:#10b981; } .off { color:#ef4444; }
+  </style>
+</head>
+<body>
+  <canvas id="particles"></canvas>
+
+  <header>
+    <h1>My Smart Plugs</h1>
+    <button class="add-btn" onclick="location.href='wifi_setup.html'">+ ADD NEW DEVICE</button>
+  </header>
+
+  <div class="grid" id="deviceContainer">
+    <p style="grid-column:1/-1; text-align:center; color:#94a3b8; font-size:1.5rem;">
+      Loading your devices...
+    </p>
+  </div>
+
+  <script>
+    const user = JSON.parse(sessionStorage.getItem('current_user') || '{}');
+    if (!user.email || !user.password) {
+      location.href = 'profile_page1.html';
+    }
+
+    const client = mqtt.connect('wss://64611cb98d5946f6a3925fe3c7fe3b65.s1.eu.hivemq.cloud:8884/mqtt', {
+      username: 'AADA_IOT_Dev',
+      password: 'Aada@008'
+    });
+
+    const devices = new Map();
+
+    client.on('connect', () => {
+      console.log('MQTT Connected – Requesting devices...');
+      client.subscribe(`smartplug/${user.email}/${user.password}/#`);
+      client.publish(`smartplug/${user.email}/${user.password}/fetch_data`, 'discover');
+    });
+
+    client.on('message', (topic, payload) => {
+      const msg = payload.toString().trim();
+      const parts = topic.split('/');
+
+      if (parts.length < 5 || parts[4] !== 'status') return;
+
+      const deviceCode = parts[3];
+
+      try {
+        const json = JSON.parse(msg);
+        const code = json.device_code || deviceCode;
+        const status = (json.status || 'OFF').toUpperCase();
+        devices.set(code, { code, status: status === 'ON' ? 'ON' : 'OFF' });
+      } catch (e) {
+        const status = (msg === 'ON' || msg === '1') ? 'ON' : 'OFF';
+        if (devices.has(deviceCode)) {
+          devices.get(deviceCode).status = status;
+        } else {
+          devices.set(deviceCode, { code: deviceCode, status });
+        }
+      }
+
+      renderDevices();
+    });
+
+    function renderDevices() {
+      const container = document.getElementById('deviceContainer');
+      container.innerHTML = '';
+
+      if (devices.size === 0) {
+        container.innerHTML = `
+          <p style="grid-column:1/-1; text-align:center; color:#94a0aec0; font-size:1.5rem;">
+            No devices found<br><small>Click "Add New Device" to get started</small>
+          </p>`;
+        return;
+      }
+
+      devices.forEach(device => {
+        const card = document.createElement('div');
+        card.className = 'device-card';
+        card.innerHTML = `
+          <div class="icon">
+            <svg viewBox="0 0 24 24">
+              <path fill="#00ff88" d="M7 3H17V6H19V2H5V6H7V3M17 18H7V15H5V19H19V15H17V18M17 8H7V13H17V8M22 7V13H20V7H22M2 7V13H4V7H2M12 10C13.11 10 14 10.9 14 12S13.11 14 12 14 10 13.11 10 12 10.9 10 12 10Z"/>
+            </svg>
+          </div>
+          <h3>${device.code}</h3>
+          <div class="status ${device.status === 'ON' ? 'on' : 'off'}">${device.status}</div>
+        `;
+        card.onclick = () => {
+          sessionStorage.setItem('active_device', device.code);
+          location.href = 'smart_plug_control.html';
+        };
+        container.appendChild(card);
+      });
+    }
+
+    // Particles Background
+    function createParticles() {
+      const canvas = document.getElementById('particles');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const particles = [];
+      for (let i = 0; i < 120; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          r: Math.random() * 3 + 1,
+          s: Math.random() * 1 - 0.5
+        });
+      }
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => {
+          ctx.fillStyle = '#00ff8844';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+          ctx.fill();
+          p.x += p.s;
+          p.y += p.s;
+          if (p.x < 0 || p.x > canvas.width) p.s *= -1;
+          if (p.y < 0 || p.y > canvas.height) p.s *= -1;
+        });
+        requestAnimationFrame(animate);
+      }
+      animate();
+      window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      });
+    }
+
+    createParticles();
+  </script>
+</body>
+</html>

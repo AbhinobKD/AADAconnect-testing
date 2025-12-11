@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AADA - Add Device</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --primary:#00ff88; --secondary:#00d4ff; --dark:#0f172a; }
+    body { margin:0; font-family:'Inter',sans-serif; background:linear-gradient(135deg,#0f172a,#16213e); color:white; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:1rem; }
+    canvas { position:fixed; top:0; left:0; z-index:-1; }
+    .card { background:rgba(15,23,42,0.9); backdrop-filter:blur(20px); padding:3rem; border-radius:20px; max-width:500px; width:100%; text-align:center; border:1px solid rgba(0,255,136,0.2); }
+    input { width:100%; padding:1rem; margin:1rem 0; border-radius:12px; border:none; background:rgba(255,255,255,0.1); color:white; font-size:1.1rem; }
+    button { width:100%; padding:1.3rem; background:var(--primary); color:black; border:none; border-radius:12px; font-size:1.4rem; font-weight:700; cursor:pointer; margin-top:1.5rem; }
+    .status { margin-top:1.5rem; font-size:1.2rem; }
+    .success { color:#10b981; } .error { color:#ef4444; }
+  </style>
+</head>
+<body>
+  <canvas id="particles"></canvas>
+  <div class="card">
+    <h2>Add New Device</h2>
+    <p>Your Device Code: <strong id="deviceCode">Loading...</strong></p>
+    <p>Make sure you're connected to: <strong>AADA-Plug</strong></p>
+    <input type="text" id="ssid" placeholder="Wi-Fi Name (SSID)" />
+    <input type="password" id="wifipass" placeholder="Wi-Fi Password" />
+    <button onclick="send()">CONNECT DEVICE</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    const prov = JSON.parse(sessionStorage.getItem('provisioning') || '{}');
+    if (!prov.email) {
+      alert("No device to add");
+      location.href = 'dashboard.html';
+    }
+    document.getElementById('deviceCode').textContent = prov.device_code;
+
+    function send() {
+      const ssid = document.getElementById('ssid').value.trim();
+      const pass = document.getElementById('wifipass').value;
+      const status = document.getElementById('status');
+
+      if (!ssid || !pass) {
+        status.textContent = "Please fill both fields";
+        status.className = "status error";
+        return;
+      }
+
+      const payload = {
+        ssid, pass,
+        email: prov.email,
+        password: prov.password,
+        device_code: prov.device_code
+      };
+
+      status.textContent = "Sending to device...";
+      status.className = "status";
+
+      fetch('http://192.168.4.1/prov', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(() => {
+        status.textContent = "Success! Device added!";
+        status.className = "status success";
+        sessionStorage.setItem('current_user', JSON.stringify({ email: prov.email, password: prov.password }));
+        sessionStorage.removeItem('provisioning');
+        setTimeout(() => location.href = 'dashboard.html', 2500);
+      })
+      .catch(() => {
+        status.textContent = "Failed. Are you on AADA-Plug Wi-Fi?";
+        status.className = "status error";
+      });
+    }
+
+    // Particles
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d');
+    canvas.width = innerWidth; canvas.height = innerHeight;
+    const particles = [];
+    for(let i=0;i<100;i++) particles.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*3+1,s:Math.random()*1-0.5});
+    (function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);particles.forEach(p=>{ctx.fillStyle='#00ff8844';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();p.x+=p.s;p.y+=p.s;if(p.x<0||p.x>canvas.width)p.s*=-1;if(p.y<0||p.y>canvas.height)p.s*=-1;});requestAnimationFrame(draw);})();
+  </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AADA - Control</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --on:#10b981; --off:#ef4444; }
+    body { margin:0; font-family:'Inter',sans-serif; background:linear-gradient(135deg,#0f172a,#16213e); color:white; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:2rem; }
+    canvas { position:fixed; top:0; left:0; z-index:-1; }
+    h1 { font-size:3.5rem; margin-bottom:1rem; background:linear-gradient(90deg,#00ff88,#00d4ff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .power { width:200px; height:200px; border-radius:50%; margin:2rem auto; display:flex; align-items:center; justify-content:center; font-size:4rem; font-weight:800; transition:0.5s; box-shadow:0 0 60px rgba(16,185,129,0.6); }
+    .on { background:var(--on); color:white; }
+    .off { background:#1e293b; color:#94a3b8; box-shadow:0 0 60px rgba(239,68,68,0.4); }
+    button { padding:1.5rem 4rem; font-size:1.8rem; margin:1rem; border:none; border-radius:50px; cursor:pointer; font-weight:700; transition:0.4s; }
+    .btn-on { background:#10b981; color:white; }
+    .btn-off { background:#ef4444; color:white; }
+    button:hover { transform:scale(1.1); }
+  </style>
+</head>
+<body>
+  <canvas id="particles"></canvas>
+  <h1 id="deviceTitle">AADA Smart Plug</h1>
+  <div class="power off" id="powerCircle">OFF</div>
+  <div id="powerStatus">OFF</div>
+  <button class="btn-on" onclick="turnOn()">TURN ON</button>
+  <button class="btn-off" onclick="turnOff()">TURN OFF</button>
+
+  <script>
+    const user = JSON.parse(sessionStorage.getItem('current_user'));
+    const deviceCode = sessionStorage.getItem('active_device');
+    if (!user || !deviceCode) window.location.href = 'profile_page1.html';
+    document.getElementById('deviceTitle').textContent = deviceCode;
+
+    const client = mqtt.connect('wss://64611cb98d5946f6a3925fe3c7fe3b65.s1.eu.hivemq.cloud:8884/mqtt', {
+      username:'AADA_IOT_Dev', password:'Aada@008'
+    });
+
+    const controlTopic = `smartplug/${user.email}/${user.password}/${deviceCode}/control`;
+    const statusTopic = `smartplug/${user.email}/${user.password}/${deviceCode}/status`;
+
+    client.on('connect', () => client.subscribe(statusTopic));
+    client.on('message', (t, m) => {
+      const state = m.toString().trim();
+      document.getElementById('powerStatus').textContent = state;
+      document.getElementById('powerCircle').className = state === 'ON' ? 'power on' : 'power off';
+      document.getElementById('powerCircle').textContent = state;
+    });
+
+    function turnOn() { client.publish(controlTopic, '1'); }
+    function turnOff() { client.publish(controlTopic, '0'); }
+
+    function createParticles() {
+      const canvas = document.getElementById('particles');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+      const particles = [];
+      for(let i=0;i<120;i++){
+        particles.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*4+1,s:Math.random()*1.5-0.75});
+      }
+      function draw(){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        particles.forEach(p=>{
+          ctx.fillStyle = '#00ff8888';
+          ctx.beginPath();
+          ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+          ctx.fill();
+          p.x += p.s; p.y += p.s;
+          if(p.x<0||p.x>canvas.width) p.s*=-1;
+          if(p.y<0||p.y>canvas.height) p.s*=-1;
+        });
+        requestAnimationFrame(draw);
+      }
+      draw();
+    }
+    window.onload = createParticles;
+  </script>
+</body>
+</html>
