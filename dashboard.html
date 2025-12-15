@@ -239,6 +239,7 @@
     let deviceStatuses = {}; // Stores device power status (ON/OFF)
     let deviceOnlineStatus = {}; // Stores device online/offline status
     let deviceTimeouts = {}; // Stores timeout IDs for offline detection
+    let deviceListTimeout = null; // Timeout for initial device list loading
 
     // Check authentication
     function checkAuth() {
@@ -283,6 +284,14 @@
             } else {
               console.log('Subscribed to:', fetchTopic);
               console.log('Waiting for retained message with device list...');
+              
+              // Set timeout - if no device list received in 5 seconds, show no devices
+              deviceListTimeout = setTimeout(() => {
+                if (devices.length === 0) {
+                  console.log('No device list received - showing empty state');
+                  renderDevices();
+                }
+              }, 5000); // 5 second timeout
             }
           });
         });
@@ -321,11 +330,18 @@
         // Check if this is a device list message
         if (data.device_list && Array.isArray(data.device_list)) {
           console.log('Device list found:', data.device_list);
+          
+          // Clear the device list timeout since we received the list
+          if (deviceListTimeout) {
+            clearTimeout(deviceListTimeout);
+            deviceListTimeout = null;
+          }
+          
           devices = data.device_list;
           
           renderDevices();
           
-          // Subscribe to status and online topics for each device
+          // Subscribe to status and OF topics for each device
           devices.forEach(device => {
             // Subscribe to status topic (ON/OFF)
             const statusTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${device.device_id}/status`;
@@ -335,11 +351,11 @@
               }
             });
             
-            // Subscribe to online/offline topic
-            const onlineTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${device.device_id}/OF`;
-            mqttClient.subscribe(onlineTopic, (err) => {
+            // Subscribe to OF (online/offline) topic
+            const ofTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${device.device_id}/OF`;
+            mqttClient.subscribe(ofTopic, (err) => {
               if (!err) {
-                console.log('Subscribed to online status:', onlineTopic);
+                console.log('Subscribed to OF status:', ofTopic);
               }
             });
           });
@@ -359,11 +375,11 @@
           deviceStatuses[deviceId] = status;
         }
 
-        // Check if this is an online/offline update
+        // Check if this is an OF (online/offline) update
         if (topicParts[topicParts.length - 1] === 'OF') {
           const deviceId = topicParts[topicParts.length - 2];
           const statusMessage = message.toString().trim();
-          console.log('Online status message for', deviceId, ':', statusMessage);
+          console.log('OF status message for', deviceId, ':', statusMessage);
           
           // Clear any pending timeout for this device
           if (deviceTimeouts[deviceId]) {
@@ -471,7 +487,7 @@
         return;
       }
 
-      const onlineTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${deviceId}/OF`;
+      const ofTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${deviceId}/OF`;
       
       // Clear any existing timeout for this device
       if (deviceTimeouts[deviceId]) {
@@ -481,7 +497,7 @@
       console.log('Checking status for device:', deviceId);
       
       // Send check_status message
-      mqttClient.publish(onlineTopic, 'check_status');
+      mqttClient.publish(ofTopic, 'check_status');
 
       // Set timeout - if no response in 5 seconds, mark as Offline
       deviceTimeouts[deviceId] = setTimeout(() => {
@@ -549,3 +565,4 @@
   </script>
 </body>
 </html>
+
