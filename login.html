@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AADA - Login</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .login-container {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 0.5rem;
+      font-size: 2rem;
+      color: #00d4ff;
+    }
+
+    .subtitle {
+      text-align: center;
+      margin-bottom: 2rem;
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #cbd5e1;
+      font-size: 0.9rem;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.9rem;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 1rem;
+      transition: all 0.3s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #00d4ff;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    input::placeholder {
+      color: #64748b;
+    }
+
+    button {
+      width: 100%;
+      padding: 1rem;
+      background: linear-gradient(90deg, #00ff88 0%, #00d4ff 100%);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 1rem;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .error {
+      color: #ef4444;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      display: none;
+    }
+
+    .info {
+      text-align: center;
+      margin-top: 1.5rem;
+      color: #94a3b8;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h1>AADA Smart Plug</h1>
+    <p class="subtitle">Login or Create New Account</p>
+
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input 
+          type="email" 
+          id="email" 
+          placeholder="your@email.com" 
+          required
+        >
+        <div class="error" id="emailError">Please enter a valid email</div>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input 
+          type="password" 
+          id="password" 
+          placeholder="Enter your password" 
+          required
+        >
+        <div class="error" id="passwordError">Please enter a password</div>
+      </div>
+
+      <div class="error" id="loginError"></div>
+
+      <button type="submit">Continue</button>
+    </form>
+
+    <div class="info">
+      First time? We'll create an account for you automatically
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <script>
+    // Simple hash function using CryptoJS SHA256
+    function hashValue(value) {
+      return CryptoJS.SHA256(value).toString(CryptoJS.enc.Hex);
+    }
+
+    function handleLogin(event) {
+      event.preventDefault();
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const emailError = document.getElementById('emailError');
+      const passwordError = document.getElementById('passwordError');
+      const loginError = document.getElementById('loginError');
+
+      // Reset errors
+      emailError.style.display = 'none';
+      passwordError.style.display = 'none';
+      loginError.style.display = 'none';
+
+      // Validate
+      if (!email || !password) {
+        if (!email) emailError.style.display = 'block';
+        if (!password) passwordError.style.display = 'block';
+        return;
+      }
+
+      // Hash the credentials
+      const hashedEmail = hashValue(email);
+      const hashedPassword = hashValue(password);
+
+      // Create account key
+      const accountKey = hashedEmail + '|' + hashedPassword;
+      
+      // Check if account exists
+      const existingAccount = localStorage.getItem('aada_account');
+
+      if (!existingAccount) {
+        // New account - save hashed credentials
+        localStorage.setItem('aada_account', accountKey);
+        localStorage.setItem('aada_email', email);
+        localStorage.setItem('aada_password', password);
+        localStorage.setItem('aada_hashed_email', hashedEmail);
+        localStorage.setItem('aada_hashed_password', hashedPassword);
+        
+        // Set session 
+        sessionStorage.setItem('current_user', JSON.stringify({
+          email: email,
+          password: password,
+          hashed_email: hashedEmail,
+          hashed_password: hashedPassword
+        }));
+        
+        alert('Account created successfully!');
+        window.location.href = 'dashboard.html';
+      } else if (existingAccount === accountKey) {
+        // Existing account - credentials match
+        sessionStorage.setItem('current_user', JSON.stringify({
+          email: email,
+          password: password,
+          hashed_email: hashedEmail,
+          hashed_password: hashedPassword
+        }));
+        
+        window.location.href = 'dashboard.html';
+      } else {
+        // Wrong credentials
+        loginError.textContent = 'Invalid email or password';
+        loginError.style.display = 'block';
+      }
+    }
+
+    // Check if already logged in
+    window.onload = function() {
+      const currentUser = sessionStorage.getItem('current_user');
+      if (currentUser) {
+        window.location.href = 'dashboard.html';
+      }
+    };
+  </script>
+</body>
+</html>
