@@ -323,9 +323,12 @@
       console.log('Topic:', topic);
       console.log('Message:', message.toString());
       
+      const topicParts = topic.split('/');
+      
+      // Try to parse as JSON first (for device list)
       try {
         const data = JSON.parse(message.toString());
-        console.log('Parsed message:', data);
+        console.log('Parsed JSON message:', data);
 
         // Check if this is a device list message
         if (data.device_list && Array.isArray(data.device_list)) {
@@ -365,37 +368,35 @@
             checkAllDevicesStatus();
           }, 500); // Small delay to ensure subscriptions are active
         }
-
-        // Check if this is a status update
-        const topicParts = topic.split('/');
-        if (topicParts[topicParts.length - 1] === 'status') {
-          const deviceId = topicParts[topicParts.length - 2];
-          const status = message.toString().trim();
-          console.log('Status update for', deviceId, ':', status);
-          deviceStatuses[deviceId] = status;
-        }
-
-        // Check if this is an OF (online/offline) update
-        if (topicParts[topicParts.length - 1] === 'OF') {
-          const deviceId = topicParts[topicParts.length - 2];
-          const statusMessage = message.toString().trim();
-          console.log('OF status message for', deviceId, ':', statusMessage);
-          
-          // Clear any pending timeout for this device
-          if (deviceTimeouts[deviceId]) {
-            clearTimeout(deviceTimeouts[deviceId]);
-            delete deviceTimeouts[deviceId];
-          }
-          
-          // Just display whatever message is received
-          deviceOnlineStatus[deviceId] = statusMessage;
-          updateDeviceOnlineStatus(deviceId, statusMessage);
-        }
-
-
       } catch (error) {
-        console.error('Error parsing message:', error);
-        console.log('Raw message was:', message.toString());
+        // Not JSON, that's okay - might be plain text status
+        console.log('Not JSON message, checking for plain text status');
+      }
+      
+      // Handle plain text status messages (outside try-catch)
+      // Check if this is a status update
+      if (topicParts[topicParts.length - 1] === 'status') {
+        const deviceId = topicParts[topicParts.length - 2];
+        const status = message.toString().trim();
+        console.log('Status update for', deviceId, ':', status);
+        deviceStatuses[deviceId] = status;
+      }
+
+      // Check if this is an OF (online/offline) update
+      if (topicParts[topicParts.length - 1] === 'OF') {
+        const deviceId = topicParts[topicParts.length - 2];
+        const statusMessage = message.toString().trim();
+        console.log('OF status message for', deviceId, ':', statusMessage);
+        
+        // Clear any pending timeout for this device
+        if (deviceTimeouts[deviceId]) {
+          clearTimeout(deviceTimeouts[deviceId]);
+          delete deviceTimeouts[deviceId];
+        }
+        
+        // Just display whatever message is received
+        deviceOnlineStatus[deviceId] = statusMessage;
+        updateDeviceOnlineStatus(deviceId, statusMessage);
       }
     }
 
@@ -566,3 +567,5 @@
 </body>
 </html>
 
+
+  
