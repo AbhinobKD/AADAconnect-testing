@@ -5,171 +5,547 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AADA - Dashboard</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --primary: #00ff88;
-      --secondary: #00d4ff;
-      --dark: #0f172a;
-      --card: rgba(15, 23, 42, 0.9);
-      --border: rgba(0, 255, 136, 0.2);
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Inter',sans-serif; background:linear-gradient(135deg,#0f172a,#16213e); color:white; min-height:100vh; padding:2rem; }
-    canvas { position:fixed; top:0; left:0; width:100%; height:100%; z-index:-1; }
-    header { text-align:center; margin-bottom:3rem; }
-    h1 { font-size:3.5rem; background:linear-gradient(90deg,var(--primary),var(--secondary)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-    .add-btn {
-      display:block; margin:2rem auto 0; padding:1.2rem 3rem;
-      background:var(--primary); color:black; border:none; border-radius:50px;
-      font-size:1.4rem; font-weight:700; cursor:pointer; box-shadow:0 10px 30px rgba(0,255,136,0.4);
-      transition:0.3s;
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      padding: 2rem;
     }
-    .add-btn:hover { transform:scale(1.05); box-shadow:0 15px 40px rgba(0,255,136,0.6); }
-    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:2rem; }
+
+    .header {
+      max-width: 1200px;
+      margin: 0 auto 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #00d4ff;
+    }
+
+    .user-info {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .controls {
+      max-width: 1200px;
+      margin: 0 auto 2rem;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 0.8rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.95rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(90deg, #00ff88 0%, #00d4ff 100%);
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .devices-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      font-size: 1.3rem;
+      margin-bottom: 1rem;
+      color: #cbd5e1;
+    }
+
+    .device-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
     .device-card {
-      background:var(--card); backdrop-filter:blur(20px);
-      padding:2.5rem; border-radius:20px; text-align:center; cursor:pointer;
-      border:2px solid transparent; transition:all 0.4s;
-      box-shadow:0 10px 30px rgba(0,0,0,0.5);
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 1.5rem;
+      cursor: pointer;
+      transition: all 0.3s;
     }
+
     .device-card:hover {
-      transform:translateY(-15px);
-      border-color:var(--primary);
-      box-shadow:0 20px 50px rgba(0,255,136,0.4);
+      transform: translateY(-5px);
+      border-color: #00d4ff;
+      box-shadow: 0 8px 24px rgba(0, 212, 255, 0.3);
     }
-    .icon svg { width:80px; height:80px; fill:var(--primary); margin-bottom:1rem; }
-    .status { font-size:1.8rem; font-weight:700; margin-top:1rem; }
-    .on { color:#10b981; } .off { color:#ef4444; }
+
+    .device-id {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #00ff88;
+    }
+
+    .device-rank {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-bottom: 0.5rem;
+    }
+
+    .device-status {
+      font-size: 0.9rem;
+      font-weight: 500;
+      padding: 0.5rem;
+      border-radius: 6px;
+      text-align: center;
+      margin-top: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .status-online {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-offline {
+      background: rgba(148, 163, 184, 0.2);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+
+    .device-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .dot-online {
+      background: #10b981;
+      box-shadow: 0 0 6px #10b981;
+    }
+
+    .dot-offline {
+      background: #64748b;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 3rem;
+      color: #94a3b8;
+      font-size: 1.1rem;
+    }
+
+    .no-devices {
+      text-align: center;
+      padding: 3rem;
+      color: #94a3b8;
+    }
+
+    .no-devices p {
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 0.5rem;
+    }
+
+    .connected {
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    .disconnected {
+      background: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
+    }
   </style>
 </head>
 <body>
-  <canvas id="particles"></canvas>
+  <div class="header">
+    <div>
+      <h1>AADA Dashboard</h1>
+      <div class="user-info">
+        <span class="status-indicator disconnected" id="mqttStatus"></span>
+        <span id="userEmail">Loading...</span>
+      </div>
+    </div>
+  </div>
 
-  <header>
-    <h1>My Smart Plugs</h1>
-    <button class="add-btn" onclick="location.href='wifi_setup.html'">+ ADD NEW DEVICE</button>
-  </header>
+  <div class="controls">
+    <button class="btn btn-primary" onclick="addDevice()">
+      ➕ Add Device
+    </button>
+    <button class="btn btn-secondary" onclick="refreshDevices()">
+      🔄 Refresh
+    </button>
+    <button class="btn btn-secondary" onclick="logout()">
+      🚪 Logout
+    </button>
+  </div>
 
-  <div class="grid" id="deviceContainer">
-    <p style="grid-column:1/-1; text-align:center; color:#94a3b8; font-size:1.5rem;">
-      Loading your devices...
-    </p>
+  <div class="devices-container">
+    <div class="section-title">My Devices</div>
+    <div class="device-grid" id="deviceGrid">
+      <div class="loading">Loading devices...</div>
+    </div>
   </div>
 
   <script>
-    const user = JSON.parse(sessionStorage.getItem('current_user') || '{}');
-    if (!user.email || !user.password) {
-      location.href = 'profile_page1.html';
+    let mqttClient = null;
+    let currentUser = null;
+    let devices = [];
+    let deviceStatuses = {}; // Stores device power status (ON/OFF)
+    let deviceOnlineStatus = {}; // Stores device online/offline status
+    let deviceTimeouts = {}; // Stores timeout IDs for offline detection
+
+    // Check authentication
+    function checkAuth() {
+      const userStr = sessionStorage.getItem('current_user');
+      if (!userStr) {
+        window.location.href = 'login.html';
+        return null;
+      }
+      return JSON.parse(userStr);
     }
 
-    const client = mqtt.connect('wss://64611cb98d5946f6a3925fe3c7fe3b65.s1.eu.hivemq.cloud:8884/mqtt', {
-      username: 'AADA_IOT_Dev',
-      password: 'Aada@008'
-    });
+    // Initialize
+    function init() {
+      currentUser = checkAuth();
+      if (!currentUser) return;
 
-    const devices = new Map();
+      document.getElementById('userEmail').textContent = currentUser.email;
+      
+      // Connect to MQTT
+      connectMQTT();
+    }
 
-    client.on('connect', () => {
-      console.log('MQTT Connected – Requesting devices...');
-      client.subscribe(`smartplug/${user.email}/${user.password}/#`);
-      client.publish(`smartplug/${user.email}/${user.password}/fetch_data`, 'discover');
-    });
-
-    client.on('message', (topic, payload) => {
-      const msg = payload.toString().trim();
-      const parts = topic.split('/');
-
-      if (parts.length < 5 || parts[4] !== 'status') return;
-
-      const deviceCode = parts[3];
-
+    // Connect to MQTT broker
+    function connectMQTT() {
+      const statusIndicator = document.getElementById('mqttStatus');
+      
       try {
-        const json = JSON.parse(msg);
-        const code = json.device_code || deviceCode;
-        const status = (json.status || 'OFF').toUpperCase();
-        devices.set(code, { code, status: status === 'ON' ? 'ON' : 'OFF' });
-      } catch (e) {
-        const status = (msg === 'ON' || msg === '1') ? 'ON' : 'OFF';
-        if (devices.has(deviceCode)) {
-          devices.get(deviceCode).status = status;
-        } else {
-          devices.set(deviceCode, { code: deviceCode, status });
-        }
+        mqttClient = mqtt.connect('wss://64611cb98d5946f6a3925fe3c7fe3b65.s1.eu.hivemq.cloud:8884/mqtt', {
+          username: 'AADA_IOT_Dev',
+          password: 'Aada@008'
+        });
+
+        mqttClient.on('connect', () => {
+          console.log('MQTT Connected');
+          statusIndicator.className = 'status-indicator connected';
+          
+          // Subscribe to fetch topic (will automatically receive retained message)
+          const fetchTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/fetch`;
+          mqttClient.subscribe(fetchTopic, (err) => {
+            if (err) {
+              console.error('Subscribe error:', err);
+            } else {
+              console.log('Subscribed to:', fetchTopic);
+              console.log('Waiting for retained message with device list...');
+            }
+          });
+        });
+
+        mqttClient.on('message', (topic, message) => {
+          console.log('Message received:', topic, message.toString());
+          handleMQTTMessage(topic, message);
+        });
+
+        mqttClient.on('error', (err) => {
+          console.error('MQTT Error:', err);
+          statusIndicator.className = 'status-indicator disconnected';
+        });
+
+        mqttClient.on('close', () => {
+          console.log('MQTT Disconnected');
+          statusIndicator.className = 'status-indicator disconnected';
+        });
+
+      } catch (error) {
+        console.error('MQTT Connection failed:', error);
+        statusIndicator.className = 'status-indicator disconnected';
       }
+    }
 
-      renderDevices();
-    });
+    // Handle MQTT messages
+    function handleMQTTMessage(topic, message) {
+      console.log('=== MQTT Message Received ===');
+      console.log('Topic:', topic);
+      console.log('Message:', message.toString());
+      
+      try {
+        const data = JSON.parse(message.toString());
+        console.log('Parsed message:', data);
 
+        // Check if this is a device list message
+        if (data.device_list && Array.isArray(data.device_list)) {
+          console.log('Device list found:', data.device_list);
+          devices = data.device_list;
+          
+          renderDevices();
+          
+          // Subscribe to status and online topics for each device
+          devices.forEach(device => {
+            // Subscribe to status topic (ON/OFF)
+            const statusTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${device.device_id}/status`;
+            mqttClient.subscribe(statusTopic, (err) => {
+              if (!err) {
+                console.log('Subscribed to status:', statusTopic);
+              }
+            });
+            
+            // Subscribe to online/offline topic
+            const onlineTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${device.device_id}/OF`;
+            mqttClient.subscribe(onlineTopic, (err) => {
+              if (!err) {
+                console.log('Subscribed to online status:', onlineTopic);
+              }
+            });
+          });
+          
+          // Check status of all devices after loading
+          setTimeout(() => {
+            checkAllDevicesStatus();
+          }, 500); // Small delay to ensure subscriptions are active
+        }
+
+        // Check if this is a status update
+        const topicParts = topic.split('/');
+        if (topicParts[topicParts.length - 1] === 'status') {
+          const deviceId = topicParts[topicParts.length - 2];
+          const status = message.toString().trim();
+          console.log('Status update for', deviceId, ':', status);
+          deviceStatuses[deviceId] = status;
+        }
+
+        // Check if this is an online/offline update
+        if (topicParts[topicParts.length - 1] === 'OF') {
+          const deviceId = topicParts[topicParts.length - 2];
+          const statusMessage = message.toString().trim();
+          console.log('Online status message for', deviceId, ':', statusMessage);
+          
+          // Clear any pending timeout for this device
+          if (deviceTimeouts[deviceId]) {
+            clearTimeout(deviceTimeouts[deviceId]);
+            delete deviceTimeouts[deviceId];
+          }
+          
+          // Just display whatever message is received
+          deviceOnlineStatus[deviceId] = statusMessage;
+          updateDeviceOnlineStatus(deviceId, statusMessage);
+        }
+
+
+      } catch (error) {
+        console.error('Error parsing message:', error);
+        console.log('Raw message was:', message.toString());
+      }
+    }
+
+    // Render devices
     function renderDevices() {
-      const container = document.getElementById('deviceContainer');
-      container.innerHTML = '';
-
-      if (devices.size === 0) {
-        container.innerHTML = `
-          <p style="grid-column:1/-1; text-align:center; color:#94a0aec0; font-size:1.5rem;">
-            No devices found<br><small>Click "Add New Device" to get started</small>
-          </p>`;
+      const grid = document.getElementById('deviceGrid');
+      
+      if (devices.length === 0) {
+        grid.innerHTML = `
+          <div class="no-devices">
+            <p>No devices found</p>
+            <p>Click "Add Device" to get started</p>
+          </div>
+        `;
         return;
       }
 
-      devices.forEach(device => {
+      grid.innerHTML = '';
+      
+      // Sort by rank
+      const sortedDevices = [...devices].sort((a, b) => a.device_rank - b.device_rank);
+      
+      sortedDevices.forEach(device => {
         const card = document.createElement('div');
         card.className = 'device-card';
+        card.dataset.deviceId = device.device_id;
+        
+        // Get the status message or default to 'Checking...'
+        const statusMessage = deviceOnlineStatus[device.device_id] || 'Checking...';
+        
+        // Determine styling based on message content (case-insensitive)
+        const statusLower = statusMessage.toLowerCase();
+        const isOnline = statusLower === 'online';
+        const statusClass = isOnline ? 'status-online' : 'status-offline';
+        const dotClass = isOnline ? 'dot-online' : 'dot-offline';
+        
         card.innerHTML = `
-          <div class="icon">
-            <svg viewBox="0 0 24 24">
-              <path fill="#00ff88" d="M7 3H17V6H19V2H5V6H7V3M17 18H7V15H5V19H19V15H17V18M17 8H7V13H17V8M22 7V13H20V7H22M2 7V13H4V7H2M12 10C13.11 10 14 10.9 14 12S13.11 14 12 14 10 13.11 10 12 10.9 10 12 10Z"/>
-            </svg>
+          <div class="device-id">${device.device_id}</div>
+          <div class="device-rank">Device #${device.device_rank}</div>
+          <div class="device-status ${statusClass}">
+            <span class="device-status-dot ${dotClass}"></span>
+            <span>${statusMessage}</span>
           </div>
-          <h3>${device.code}</h3>
-          <div class="status ${device.status === 'ON' ? 'on' : 'off'}">${device.status}</div>
         `;
-        card.onclick = () => {
-          sessionStorage.setItem('active_device', device.code);
-          location.href = 'smart_plug_control.html';
-        };
-        container.appendChild(card);
+        
+        card.onclick = () => openDeviceControl(device.device_id);
+        grid.appendChild(card);
       });
     }
 
-    // Particles Background
-    function createParticles() {
-      const canvas = document.getElementById('particles');
-      const ctx = canvas.getContext('2d');
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      const particles = [];
-      for (let i = 0; i < 120; i++) {
-        particles.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          r: Math.random() * 3 + 1,
-          s: Math.random() * 1 - 0.5
-        });
-      }
-      function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        particles.forEach(p => {
-          ctx.fillStyle = '#00ff8844';
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
-          ctx.fill();
-          p.x += p.s;
-          p.y += p.s;
-          if (p.x < 0 || p.x > canvas.width) p.s *= -1;
-          if (p.y < 0 || p.y > canvas.height) p.s *= -1;
-        });
-        requestAnimationFrame(animate);
-      }
-      animate();
-      window.addEventListener('resize', () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+    // Update device status
+    function updateDeviceStatus(deviceId, status) {
+      const cards = document.querySelectorAll('.device-card');
+      cards.forEach(card => {
+        const idElement = card.querySelector('.device-id');
+        if (idElement && idElement.textContent === deviceId) {
+          const statusElement = card.querySelector('.device-status');
+          statusElement.textContent = status;
+          statusElement.className = 'device-status ' + 
+            (status === 'ON' ? 'status-on' : status === 'OFF' ? 'status-off' : 'status-unknown');
+        }
       });
     }
 
-    createParticles();
+    // Update device online/offline status
+    function updateDeviceOnlineStatus(deviceId, statusMessage) {
+      const cards = document.querySelectorAll('.device-card');
+      cards.forEach(card => {
+        if (card.dataset.deviceId === deviceId) {
+          const statusElement = card.querySelector('.device-status');
+          const dotElement = card.querySelector('.device-status-dot');
+          const textElement = statusElement.querySelector('span:last-child');
+          
+          // Determine styling based on message content (case-insensitive)
+          const statusLower = statusMessage.toLowerCase();
+          const isOnline = statusLower === 'online';
+          
+          statusElement.className = 'device-status ' + (isOnline ? 'status-online' : 'status-offline');
+          dotElement.className = 'device-status-dot ' + (isOnline ? 'dot-online' : 'dot-offline');
+          textElement.textContent = statusMessage;
+        }
+      });
+    }
+
+    // Check device status by sending "check_status" and waiting for response
+    function checkDeviceStatus(deviceId) {
+      if (!mqttClient || !mqttClient.connected) {
+        console.log('Cannot check status - MQTT not connected');
+        return;
+      }
+
+      const onlineTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${deviceId}/OF`;
+      
+      // Clear any existing timeout for this device
+      if (deviceTimeouts[deviceId]) {
+        clearTimeout(deviceTimeouts[deviceId]);
+      }
+
+      console.log('Checking status for device:', deviceId);
+      
+      // Send check_status message
+      mqttClient.publish(onlineTopic, 'check_status');
+
+      // Set timeout - if no response in 5 seconds, mark as Offline
+      deviceTimeouts[deviceId] = setTimeout(() => {
+        console.log('Device timeout - no response from:', deviceId);
+        deviceOnlineStatus[deviceId] = 'Offline';
+        updateDeviceOnlineStatus(deviceId, 'Offline');
+      }, 5000); // 5 second timeout
+    }
+
+    // Check all devices status
+    function checkAllDevicesStatus() {
+      console.log('Checking all devices status...');
+      devices.forEach(device => {
+        checkDeviceStatus(device.device_id);
+      });
+    }
+
+    // Open device control page
+    function openDeviceControl(deviceId) {
+      sessionStorage.setItem('active_device', deviceId);
+      window.location.href = 'control.html';
+    }
+
+    // Add new device
+    function addDevice() {
+      // Generate new device ID
+      const deviceId = 'AADA-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+      
+      // Store provisioning data
+      sessionStorage.setItem('provisioning', JSON.stringify({
+        email: currentUser.email,
+        password: currentUser.password,
+        hashed_email: currentUser.hashed_email,
+        hashed_password: currentUser.hashed_password,
+        device_id: deviceId
+      }));
+      
+      // Redirect to WiFi setup
+      window.location.href = 'wifi_setup.html';
+    }
+
+    // Refresh devices
+    function refreshDevices() {
+      if (!mqttClient || !mqttClient.connected) {
+        alert('Not connected to MQTT');
+        return;
+      }
+      
+      console.log('Refreshing devices - checking online status...');
+      
+      // Check status of all devices
+      checkAllDevicesStatus();
+    }
+
+    // Logout
+    function logout() {
+      if (confirm('Are you sure you want to logout?')) {
+        sessionStorage.clear();
+        window.location.href = 'login.html';
+      }
+    }
+
+    // Initialize on load
+    window.onload = init;
   </script>
 </body>
 </html>
