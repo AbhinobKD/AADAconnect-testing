@@ -503,8 +503,8 @@
       // Set timeout - if no response in 5 seconds, mark as Offline
       deviceTimeouts[deviceId] = setTimeout(() => {
         console.log('Device timeout - no response from:', deviceId);
-        deviceOnlineStatus[deviceId] = 'Offline';
-        updateDeviceOnlineStatus(deviceId, 'Offline');
+        deviceOnlineStatus[deviceId] = 'offline';
+        updateDeviceOnlineStatus(deviceId, 'offline');
       }, 5000); // 5 second timeout
     }
 
@@ -569,4 +569,5 @@
 
 
   
+
 
