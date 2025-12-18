@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AADA - Login</title>
+  <!-- Security Headers -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+  <meta name="referrer" content="no-referrer">
   <style>
     * {
       margin: 0;
@@ -153,13 +158,109 @@
     <div class="info">
       First time? We'll create an account for you automatically
     </div>
+    
+    <div class="info" style="margin-top: 1rem; font-size: 0.8rem;">
+      <a href="#" onclick="clearAccount(event)" style="color: #94a3b8; text-decoration: underline;">
+        Clear saved account
+      </a>
+    </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
   <script>
+    // Clear saved account data
+    function clearAccount(event) {
+      event.preventDefault();
+      
+      const savedEmail = localStorage.getItem('aada_email');
+      if (!savedEmail) {
+        alert('No account data to clear');
+        return;
+      }
+      
+      if (confirm(`This will remove the saved account (${savedEmail}) from this browser. Continue?`)) {
+        localStorage.removeItem('aada_account');
+        localStorage.removeItem('aada_email');
+        localStorage.removeItem('aada_password');
+        localStorage.removeItem('aada_hashed_email');
+        localStorage.removeItem('aada_hashed_password');
+        sessionStorage.clear();
+        alert('Account data cleared successfully!');
+        location.reload();
+      }
+    }
+    
     // Simple hash function using CryptoJS SHA256
     function hashValue(value) {
       return CryptoJS.SHA256(value).toString(CryptoJS.enc.Hex);
+    }
+
+    // Password strength validation
+    function validatePasswordStrength(password) {
+      const minLength = 8;
+      const hasUpperCase = /[A-Z]/.test(password);
+      const hasLowerCase = /[a-z]/.test(password);
+      const hasNumbers = /\d/.test(password);
+      const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+      
+      const errors = [];
+      
+      if (password.length < minLength) {
+        errors.push('at least 8 characters');
+      }
+      if (!hasUpperCase) {
+        errors.push('one uppercase letter');
+      }
+      if (!hasLowerCase) {
+        errors.push('one lowercase letter');
+      }
+      if (!hasNumbers) {
+        errors.push('one number');
+      }
+      if (!hasSpecialChar) {
+        errors.push('one special character');
+      }
+      
+      return {
+        isValid: errors.length === 0,
+        errors: errors
+      };
+    }
+
+    // Validate email format
+    function validateEmail(email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email);
+    }
+
+    // Rate limiting for login attempts
+    let loginAttempts = 0;
+    let lastAttemptTime = 0;
+    const MAX_ATTEMPTS = 5;
+    const LOCKOUT_TIME = 5 * 60 * 1000; // 5 minutes
+
+    function checkRateLimit() {
+      const now = Date.now();
+      
+      // Reset counter if lockout time has passed
+      if (now - lastAttemptTime > LOCKOUT_TIME) {
+        loginAttempts = 0;
+      }
+      
+      if (loginAttempts >= MAX_ATTEMPTS) {
+        const timeRemaining = Math.ceil((LOCKOUT_TIME - (now - lastAttemptTime)) / 1000 / 60);
+        return {
+          allowed: false,
+          message: `Too many login attempts. Please try again in ${timeRemaining} minute(s).`
+        };
+      }
+      
+      return { allowed: true };
+    }
+
+    function recordFailedAttempt() {
+      loginAttempts++;
+      lastAttemptTime = Date.now();
     }
 
     function handleLogin(event) {
@@ -176,10 +277,25 @@
       passwordError.style.display = 'none';
       loginError.style.display = 'none';
 
+      // Check rate limiting
+      const rateCheck = checkRateLimit();
+      if (!rateCheck.allowed) {
+        loginError.textContent = rateCheck.message;
+        loginError.style.display = 'block';
+        return;
+      }
+
       // Validate
       if (!email || !password) {
         if (!email) emailError.style.display = 'block';
         if (!password) passwordError.style.display = 'block';
+        return;
+      }
+
+      // Validate email format
+      if (!validateEmail(email)) {
+        emailError.textContent = 'Please enter a valid email address';
+        emailError.style.display = 'block';
         return;
       }
 
@@ -194,37 +310,101 @@
       const existingAccount = localStorage.getItem('aada_account');
 
       if (!existingAccount) {
-        // New account - save hashed credentials
+        // New account - validate password strength
+        const passwordValidation = validatePasswordStrength(password);
+        if (!passwordValidation.isValid) {
+          passwordError.textContent = 'Password must contain: ' + passwordValidation.errors.join(', ');
+          passwordError.style.display = 'block';
+          return;
+        }
+
+        // Save hashed credentials (NOT plain password in localStorage for production!)
+        // Note: For better security, plain passwords should only be kept in sessionStorage
         localStorage.setItem('aada_account', accountKey);
         localStorage.setItem('aada_email', email);
-        localStorage.setItem('aada_password', password);
         localStorage.setItem('aada_hashed_email', hashedEmail);
         localStorage.setItem('aada_hashed_password', hashedPassword);
         
-        // Set session 
+        // Set session with plain credentials (needed for MQTT)
         sessionStorage.setItem('current_user', JSON.stringify({
           email: email,
           password: password,
           hashed_email: hashedEmail,
           hashed_password: hashedPassword
         }));
+        
+        // Clear the password input
+        document.getElementById('password').value = '';
         
         alert('Account created successfully!');
         window.location.href = 'dashboard.html';
       } else if (existingAccount === accountKey) {
         // Existing account - credentials match
+        // Get stored plain password for MQTT (in production, consider alternative auth)
+        const storedPassword = localStorage.getItem('aada_password');
+        
         sessionStorage.setItem('current_user', JSON.stringify({
           email: email,
-          password: password,
+          password: storedPassword || password, // Fallback to entered password
           hashed_email: hashedEmail,
           hashed_password: hashedPassword
         }));
         
+        // Clear the password input
+        document.getElementById('password').value = '';
+        
+        // Reset login attempts on successful login
+        loginAttempts = 0;
+        
         window.location.href = 'dashboard.html';
       } else {
-        // Wrong credentials
-        loginError.textContent = 'Invalid email or password';
-        loginError.style.display = 'block';
+        // Different account - ask to switch
+        recordFailedAttempt();
+        
+        const savedEmail = localStorage.getItem('aada_email');
+        if (confirm(`An account (${savedEmail}) is already registered on this browser. Do you want to switch to the new account? This will log you out of the current account.`)) {
+          
+          // Validate password strength for new account
+          const passwordValidation = validatePasswordStrength(password);
+          if (!passwordValidation.isValid) {
+            passwordError.textContent = 'Password must contain: ' + passwordValidation.errors.join(', ');
+            passwordError.style.display = 'block';
+            return;
+          }
+          
+          // Clear old account data
+          localStorage.removeItem('aada_account');
+          localStorage.removeItem('aada_email');
+          localStorage.removeItem('aada_password');
+          localStorage.removeItem('aada_hashed_email');
+          localStorage.removeItem('aada_hashed_password');
+          
+          // Save new account
+          localStorage.setItem('aada_account', accountKey);
+          localStorage.setItem('aada_email', email);
+          localStorage.setItem('aada_hashed_email', hashedEmail);
+          localStorage.setItem('aada_hashed_password', hashedPassword);
+          
+          // Set session
+          sessionStorage.setItem('current_user', JSON.stringify({
+            email: email,
+            password: password,
+            hashed_email: hashedEmail,
+            hashed_password: hashedPassword
+          }));
+          
+          // Clear the password input
+          document.getElementById('password').value = '';
+          
+          // Reset login attempts on successful switch
+          loginAttempts = 0;
+          
+          alert('Account switched successfully!');
+          window.location.href = 'dashboard.html';
+        } else {
+          loginError.textContent = 'Login cancelled. Please use the registered account.';
+          loginError.style.display = 'block';
+        }
       }
     }
 
@@ -238,3 +418,4 @@
   </script>
 </body>
 </html>
+   
