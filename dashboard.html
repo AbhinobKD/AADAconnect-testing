@@ -240,10 +240,10 @@
       ➕ Add Device
     </button>
     <button class="btn btn-secondary" onclick="refreshDevices()">
-      Refresh
+      🔄 Refresh
     </button>
     <button class="btn btn-secondary" onclick="logout()">
-      Logout
+      🚪 Logout
     </button>
   </div>
 
@@ -410,23 +410,25 @@
       if (topicParts[topicParts.length - 1] === 'OF') {
         const deviceId = topicParts[topicParts.length - 2];
         const statusMessage = message.toString().trim();
-        console.log('OF status message for', deviceId, ':', statusMessage);
+        console.log('OF status message received for', deviceId, ':', statusMessage);
         
-        // Ignore "check_status" messages - these are commands, not status updates
-        if (statusMessage === 'check_status') {
-          console.log('Ignoring check_status command');
-          return;
+        // Only process if it's NOT a "check_status" command
+        if (statusMessage !== 'check_status') {
+          console.log('Valid status update received:', statusMessage);
+          
+          // Clear any pending timeout for this device
+          if (deviceTimeouts[deviceId]) {
+            console.log('Clearing timeout for', deviceId);
+            clearTimeout(deviceTimeouts[deviceId]);
+            delete deviceTimeouts[deviceId];
+          }
+          
+          // Display the message received
+          deviceOnlineStatus[deviceId] = statusMessage;
+          updateDeviceOnlineStatus(deviceId, statusMessage);
+        } else {
+          console.log('Ignoring check_status command echo');
         }
-        
-        // Clear any pending timeout for this device
-        if (deviceTimeouts[deviceId]) {
-          clearTimeout(deviceTimeouts[deviceId]);
-          delete deviceTimeouts[deviceId];
-        }
-        
-        // Display the message received
-        deviceOnlineStatus[deviceId] = statusMessage;
-        updateDeviceOnlineStatus(deviceId, statusMessage);
       }
     }
 
@@ -621,5 +623,3 @@
   </script>
 </body>
 </html>
-      
-   
