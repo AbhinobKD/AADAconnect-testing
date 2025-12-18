@@ -240,10 +240,10 @@
       ➕ Add Device
     </button>
     <button class="btn btn-secondary" onclick="refreshDevices()">
-      🔄 Refresh
+      Refresh
     </button>
     <button class="btn btn-secondary" onclick="logout()">
-      🚪 Logout
+      Logout
     </button>
   </div>
 
@@ -411,6 +411,12 @@
         const deviceId = topicParts[topicParts.length - 2];
         const statusMessage = message.toString().trim();
         console.log('OF status message for', deviceId, ':', statusMessage);
+        
+        // Ignore "check_status" messages - these are commands, not status updates
+        if (statusMessage === 'check_status') {
+          console.log('Ignoring check_status command');
+          return;
+        }
         
         // Clear any pending timeout for this device
         if (deviceTimeouts[deviceId]) {
@@ -615,4 +621,5 @@
   </script>
 </body>
 </html>
-
+      
+   
