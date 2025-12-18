@@ -150,12 +150,6 @@
       border: 1px solid rgba(148, 163, 184, 0.3);
     }
 
-    .status-checking {
-      background: rgba(0, 212, 255, 0.2);
-      color: #00d4ff;
-      border: 1px solid rgba(0, 212, 255, 0.3);
-    }
-
     .device-status-dot {
       width: 8px;
       height: 8px;
@@ -169,22 +163,6 @@
 
     .dot-offline {
       background: #64748b;
-    }
-
-    .dot-checking {
-      background: #00d4ff;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% {
-        opacity: 1;
-        box-shadow: 0 0 6px #00d4ff;
-      }
-      50% {
-        opacity: 0.5;
-        box-shadow: 0 0 12px #00d4ff;
-      }
     }
 
     .loading {
@@ -297,22 +275,20 @@
         mqttClient.on('connect', () => {
           console.log('MQTT Connected');
           statusIndicator.className = 'status-indicator connected';
-
-          // Subscribe to get device list
-          const getDevicesTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/get_devices`;
-          mqttClient.subscribe(getDevicesTopic, (err) => {
+          
+          // Subscribe to fetch topic (will automatically receive retained message)
+          const fetchTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/fetch`;
+          mqttClient.subscribe(fetchTopic, (err) => {
             if (err) {
               console.error('Subscribe error:', err);
             } else {
-              console.log('Subscribed to:', getDevicesTopic);
+              console.log('Subscribed to:', fetchTopic);
+              console.log('Waiting for retained message with device list...');
               
-              // Request device list
-              mqttClient.publish(getDevicesTopic, 'get');
-              
-              // Set timeout - if no device list received in 5 seconds, show "no devices"
+              // Set timeout - if no device list received in 5 seconds, show no devices
               deviceListTimeout = setTimeout(() => {
                 if (devices.length === 0) {
-                  console.log('No device list received, showing empty state');
+                  console.log('No device list received - showing empty state');
                   renderDevices();
                 }
               }, 5000); // 5 second timeout
@@ -410,25 +386,17 @@
       if (topicParts[topicParts.length - 1] === 'OF') {
         const deviceId = topicParts[topicParts.length - 2];
         const statusMessage = message.toString().trim();
-        console.log('OF status message received for', deviceId, ':', statusMessage);
+        console.log('OF status message for', deviceId, ':', statusMessage);
         
-        // Only process if it's NOT a "check_status" command
-        if (statusMessage !== 'check_status') {
-          console.log('Valid status update received:', statusMessage);
-          
-          // Clear any pending timeout for this device
-          if (deviceTimeouts[deviceId]) {
-            console.log('Clearing timeout for', deviceId);
-            clearTimeout(deviceTimeouts[deviceId]);
-            delete deviceTimeouts[deviceId];
-          }
-          
-          // Display the message received
-          deviceOnlineStatus[deviceId] = statusMessage;
-          updateDeviceOnlineStatus(deviceId, statusMessage);
-        } else {
-          console.log('Ignoring check_status command echo');
+        // Clear any pending timeout for this device
+        if (deviceTimeouts[deviceId]) {
+          clearTimeout(deviceTimeouts[deviceId]);
+          delete deviceTimeouts[deviceId];
         }
+        
+        // Just display whatever message is received
+        deviceOnlineStatus[deviceId] = statusMessage;
+        updateDeviceOnlineStatus(deviceId, statusMessage);
       }
     }
 
@@ -461,18 +429,9 @@
         
         // Determine styling based on message content (case-insensitive)
         const statusLower = statusMessage.toLowerCase();
-        let statusClass, dotClass;
-        
-        if (statusLower === 'online') {
-          statusClass = 'status-online';
-          dotClass = 'dot-online';
-        } else if (statusLower === 'checking...') {
-          statusClass = 'status-checking';
-          dotClass = 'dot-checking';
-        } else {
-          statusClass = 'status-offline';
-          dotClass = 'dot-offline';
-        }
+        const isOnline = statusLower === 'online';
+        const statusClass = isOnline ? 'status-online' : 'status-offline';
+        const dotClass = isOnline ? 'dot-online' : 'dot-offline';
         
         card.innerHTML = `
           <div class="device-id">${device.device_id}</div>
@@ -513,22 +472,10 @@
           
           // Determine styling based on message content (case-insensitive)
           const statusLower = statusMessage.toLowerCase();
-          let statusClass, dotClass;
+          const isOnline = statusLower === 'online';
           
-          if (statusLower === 'online') {
-            statusClass = 'status-online';
-            dotClass = 'dot-online';
-          } else if (statusLower === 'checking...') {
-            statusClass = 'status-checking';
-            dotClass = 'dot-checking';
-          } else {
-            // Any other status (offline, etc.) shows as offline
-            statusClass = 'status-offline';
-            dotClass = 'dot-offline';
-          }
-          
-          statusElement.className = 'device-status ' + statusClass;
-          dotElement.className = 'device-status-dot ' + dotClass;
+          statusElement.className = 'device-status ' + (isOnline ? 'status-online' : 'status-offline');
+          dotElement.className = 'device-status-dot ' + (isOnline ? 'dot-online' : 'dot-offline');
           textElement.textContent = statusMessage;
         }
       });
@@ -550,18 +497,14 @@
 
       console.log('Checking status for device:', deviceId);
       
-      // Update UI to show "Checking..."
-      deviceOnlineStatus[deviceId] = 'Checking...';
-      updateDeviceOnlineStatus(deviceId, 'Checking...');
-      
       // Send check_status message
       mqttClient.publish(ofTopic, 'check_status');
 
       // Set timeout - if no response in 5 seconds, mark as Offline
       deviceTimeouts[deviceId] = setTimeout(() => {
         console.log('Device timeout - no response from:', deviceId);
-        deviceOnlineStatus[deviceId] = 'Offline';
-        updateDeviceOnlineStatus(deviceId, 'Offline');
+        deviceOnlineStatus[deviceId] = 'offline';
+        updateDeviceOnlineStatus(deviceId, 'offline');
       }, 5000); // 5 second timeout
     }
 
