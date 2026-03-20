@@ -1,0 +1,2359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#040406">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AADAconnect | Liquid Intelligence</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #040406;
+      --text-p: #ffffff;
+      --text-s: rgba(255, 255, 255, 0.5);
+      --glass-fill: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --specular: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%, rgba(255,255,255,0.05) 100%);
+      --accent-hue: 240;
+      --accent-glow: hsla(var(--accent-hue), 80%, 60%, 0.5);
+
+      /* Compat vars for sheets/action items */
+      --bg-secondary: #0d0d12;
+      --bg-card: rgba(255, 255, 255, 0.04);
+      --bg-card-hover: rgba(255, 255, 255, 0.08);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.55);
+      --text-muted: rgba(255,255,255,0.3);
+      --border-color: rgba(255, 255, 255, 0.12);
+      --accent-primary: hsl(var(--accent-hue), 80%, 60%);
+      --accent-secondary: hsl(calc(var(--accent-hue) + 40), 80%, 60%);
+      --status-online: #10b981;
+      --status-offline: rgba(255,255,255,0.3);
+      --status-checking: rgba(255,255,255,0.45);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-xl: 28px;
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+      --shadow-xl: 0 20px 40px rgba(0,0,0,0.6);
+    }
+
+    * {
+      margin: 0; padding: 0; box-sizing: border-box;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-p);
+      min-height: 100vh;
+      overflow-x: hidden;
+      transition: background 1.5s ease;
+    }
+
+    /* ── Liquid Ambient Background ── */
+    .liquid-bg {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 0;
+      filter: blur(80px);
+      opacity: 0.6;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .blob {
+      position: absolute;
+      width: 500px; height: 500px;
+      border-radius: 50%;
+      transition: all 2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ── Layout ── */
+    .app-shell {
+      width: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      padding: 24px 24px 180px;
+      position: relative;
+      z-index: 10;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      padding: 8px;
+    }
+
+    .brand-logo {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(to right, #fff, var(--text-s));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .profile-orbit {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      background: var(--glass-fill);
+      border: 1px solid var(--glass-border);
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(10px);
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+    .profile-orbit:active { transform: scale(0.92); }
+
+    /* MQTT status in header */
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 10px currentColor;
+      flex-shrink: 0;
+    }
+    .status-dot.connected { background: var(--status-online); color: var(--status-online); }
+    .status-dot.disconnected { background: rgba(255,255,255,0.25); color: rgba(255,255,255,0.25); }
+
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      color: var(--text-s);
+    }
+
+    /* ── Search Bar ── */
+    .search-container {
+      margin-bottom: 20px;
+    }
+
+    .search-wrapper {
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 14px 16px 14px 46px;
+      background: var(--glass-fill);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      color: var(--text-p);
+      font-size: 0.9rem;
+      font-family: inherit;
+      backdrop-filter: blur(20px);
+      outline: none;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .search-input:focus {
+      border-color: hsla(var(--accent-hue), 80%, 60%, 0.6);
+      box-shadow: 0 0 0 3px hsla(var(--accent-hue), 80%, 60%, 0.1);
+    }
+    .search-input::placeholder { color: var(--text-s); }
+
+    .search-icon {
+      position: absolute; left: 16px; top: 50%;
+      transform: translateY(-50%);
+      width: 18px; height: 18px;
+      stroke: var(--text-s);
+      pointer-events: none;
+    }
+
+    .clear-search {
+      position: absolute; right: 10px; top: 50%;
+      transform: translateY(-50%);
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      display: none;
+      align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .clear-search.show { display: flex; }
+    .clear-search svg { width: 14px; height: 14px; stroke: var(--text-s); stroke-width: 2; }
+
+    /* Filter Chips */
+    .filter-chips {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
+    }
+    .filter-chips::-webkit-scrollbar { display: none; }
+
+    .chip {
+      padding: 7px 14px;
+      background: var(--glass-fill);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text-s);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      display: flex; align-items: center; gap: 6px;
+      backdrop-filter: blur(10px);
+    }
+    .chip:active { transform: scale(0.95); }
+    .chip.active {
+      background: hsla(var(--accent-hue), 80%, 60%, 0.15);
+      border-color: hsla(var(--accent-hue), 80%, 60%, 0.4);
+      color: hsl(var(--accent-hue), 80%, 75%);
+    }
+    .chip-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .chip-count {
+      background: rgba(255,255,255,0.12);
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 0.68rem;
+      font-weight: 700;
+    }
+
+    /* ── Hero Card ── */
+    .liquid-card {
+      position: relative;
+      background: var(--glass-fill);
+      backdrop-filter: blur(40px) saturate(180%);
+      border-radius: 40px;
+      padding: 32px;
+      border: 1px solid var(--glass-border);
+      margin-bottom: 48px;
+      overflow: hidden;
+      background-image: var(--specular);
+      background-clip: padding-box;
+      box-shadow:
+        0 4px 24px rgba(0,0,0,0.5),
+        0 30px 60px -12px var(--accent-glow),
+        0 18px 36px -18px rgba(0,0,0,0.8);
+      transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .liquid-card::before {
+      content: '';
+      position: absolute; top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .liquid-card h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 12px; }
+    .liquid-card p { font-size: 0.95rem; line-height: 1.6; color: var(--text-s); }
+
+    .hero-tags {
+      margin-top: 24px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .hero-tag {
+      padding: 6px 14px;
+      border-radius: 100px;
+      background: rgba(255,255,255,0.1);
+      font-size: 0.7rem;
+      font-weight: 700;
+      border: 1px solid var(--glass-border);
+      display: flex; align-items: center; gap: 5px;
+    }
+
+    /* ── Section Header ── */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 0 4px;
+    }
+
+    .section-tag {
+      font-size: 0.7rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 2px; color: var(--text-s);
+    }
+
+    .sort-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 14px;
+      background: var(--glass-fill);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      font-size: 0.72rem; font-weight: 700;
+      color: var(--text-s);
+      cursor: pointer; font-family: inherit;
+      backdrop-filter: blur(10px);
+      transition: all 0.2s ease;
+    }
+    .sort-btn svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2; }
+    .sort-btn:active { transform: scale(0.95); }
+
+    /* ── Device Grid ── */
+    .bento-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding-bottom: 20px;
+    }
+
+    .glass-tile {
+      background: var(--glass-fill);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 32px;
+      padding: 24px;
+      transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      min-height: 130px;
+    }
+
+    .glass-tile:hover { transform: translateY(-3px); }
+    .glass-tile:active { transform: scale(0.97); }
+
+    .glass-tile.online {
+      background: rgba(255,255,255,0.07);
+      border-color: rgba(255,255,255,0.18);
+    }
+
+    .tile-icon {
+      width: 46px; height: 46px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.05);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.15rem;
+      margin-bottom: 32px;
+      transition: 0.3s;
+      color: var(--text-s);
+    }
+
+    .glass-tile.online .tile-icon {
+      background: hsla(var(--accent-hue), 80%, 50%, 0.25);
+      color: hsl(var(--accent-hue), 80%, 75%);
+    }
+
+    .tile-name {
+      font-size: 0.9rem; font-weight: 600;
+      margin-bottom: 4px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .tile-status {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 0.7rem; color: var(--text-s);
+    }
+
+    .tile-status-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: currentColor;
+      animation: pulse 2s infinite;
+    }
+
+    .tile-status.online { color: var(--status-online); }
+    .tile-status.checking { color: var(--text-s); }
+    .tile-status.offline { color: rgba(255,255,255,0.25); }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /* ── Swipeable / Quick Control ── */
+    .glass-tile.swipeable {
+      padding: 0;
+      overflow: hidden;
+      cursor: default;
+    }
+    .glass-tile.swipeable:hover { transform: none; }
+
+    .card-track {
+      display: flex;
+      width: 200%;
+      transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+    }
+    .card-track.revealed { transform: translateX(-50%); }
+
+    .card-panel {
+      width: 50%; flex-shrink: 0;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .card-panel-info { padding: 24px; position: relative; width: 50%; }
+    .card-panel-info .tile-name { width: 100%; }
+    .card-panel-control {
+      justify-content: center; gap: 10px; padding: 20px 16px;
+    }
+
+    .swipe-hint {
+      position: absolute; right: 8px; top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none; opacity: 0;
+      animation: hintAppear 0.6s ease 1.2s forwards, hintBounce 2s ease-in-out 1.8s infinite;
+    }
+    .swipe-hint svg { width: 12px; height: 12px; stroke: var(--text-s); stroke-width: 2.5; }
+    .card-track.revealed .swipe-hint { display: none; }
+
+    @keyframes hintAppear { to { opacity: 0.45; } }
+    @keyframes hintBounce {
+      0%, 100% { transform: translateY(-50%) translateX(0); opacity: 0.45; }
+      50% { transform: translateY(-50%) translateX(-4px); opacity: 0.7; }
+    }
+
+    .qc-back-hint {
+      position: absolute; left: 8px; top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none; opacity: 0.3;
+    }
+    .qc-back-hint svg { width: 12px; height: 12px; stroke: var(--text-s); stroke-width: 2.5; }
+
+    .qc-power-btn {
+      width: 58px; height: 58px;
+      border-radius: 50%; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.18s ease, box-shadow 0.25s ease;
+      flex-shrink: 0;
+    }
+    .qc-power-btn:active { transform: scale(0.9); }
+    .qc-power-btn.state-on {
+      background: linear-gradient(145deg, #059669, #10b981);
+      box-shadow: 0 0 0 6px rgba(16,185,129,0.14), 0 6px 18px rgba(16,185,129,0.45);
+    }
+    .qc-power-btn.state-off {
+      background: linear-gradient(145deg, #0369a1, #0ea5e9);
+      box-shadow: 0 0 0 6px rgba(14,165,233,0.14), 0 6px 18px rgba(14,165,233,0.4);
+    }
+    .qc-power-btn.state-pending {
+      background: linear-gradient(145deg, #0891b2, #06b6d4);
+      box-shadow: 0 0 0 6px rgba(6,182,212,0.14), 0 6px 18px rgba(6,182,212,0.4);
+      cursor: default;
+      animation: pendingRing 1.1s ease-in-out infinite;
+    }
+    .qc-power-btn.state-unknown {
+      background: rgba(255,255,255,0.12);
+      box-shadow: 0 0 0 6px rgba(255,255,255,0.05), 0 6px 18px rgba(0,0,0,0.3);
+    }
+    @keyframes pendingRing {
+      0%,100% { box-shadow: 0 0 0 6px rgba(6,182,212,0.14), 0 6px 18px rgba(6,182,212,0.4); }
+      50% { box-shadow: 0 0 0 11px rgba(6,182,212,0.22), 0 6px 24px rgba(6,182,212,0.55); }
+    }
+
+    .qc-power-icon {
+      width: 24px; height: 24px;
+      stroke: white; stroke-width: 2.5; stroke-linecap: round;
+      fill: none; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.25));
+    }
+    .qc-power-btn.state-pending .qc-power-icon { opacity: 0.6; }
+
+    .qc-status-label {
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      text-align: center;
+    }
+    .qc-status-label.state-on { color: #10b981; }
+    .qc-status-label.state-off { color: #38bdf8; }
+    .qc-status-label.state-pending { color: #22d3ee; }
+    .qc-status-label.state-unknown { color: var(--text-s); }
+
+    /* ── Loading / Empty ── */
+    .loading { grid-column: 1/-1; text-align: center; padding: 60px 20px; }
+    .loading-spinner {
+      width: 44px; height: 44px;
+      border: 3px solid var(--glass-border);
+      border-top-color: hsl(var(--accent-hue), 80%, 60%);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 0.9rem; color: var(--text-s); }
+
+    .empty-state {
+      grid-column: 1/-1;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 60px 20px; text-align: center;
+    }
+    .empty-icon {
+      width: 72px; height: 72px;
+      border-radius: 24px;
+      background: var(--glass-fill);
+      border: 1px solid var(--glass-border);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+    }
+    .empty-icon svg { width: 32px; height: 32px; stroke: var(--text-s); stroke-width: 1.5; }
+    .empty-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+    .empty-subtitle { font-size: 0.82rem; color: var(--text-s); max-width: 260px; line-height: 1.5; }
+
+    /* ── Fluid Nav Dock ── */
+    .dock-wrapper {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px;
+      z-index: 100;
+      padding: 0 24px 24px;
+      /* Bottom fade that sits beneath the dock */
+      background: linear-gradient(to top, var(--bg) 0%, var(--bg) 30%, transparent 100%);
+      pointer-events: none;
+    }
+    .dock-wrapper > * { pointer-events: auto; }
+    body.white-theme .dock-wrapper {
+      background: linear-gradient(to top, #f0f0f5 0%, #f0f0f5 30%, transparent 100%);
+    }
+    .dock {
+      background: rgba(10, 10, 15, 0.7);
+      backdrop-filter: blur(30px) saturate(150%);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      padding: 8px;
+      display: flex; justify-content: space-around; align-items: center;
+      box-shadow: none;
+    }
+    .dock-item {
+      width: 52px; height: 52px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-s); font-size: 1.1rem;
+      transition: 0.3s; cursor: pointer;
+    }
+    .dock-item.active { color: #fff; background: rgba(255,255,255,0.1); }
+    .action-fab {
+      background: #fff; color: #000;
+      width: 60px; height: 60px;
+      margin-top: -38px;
+      box-shadow: 0 10px 20px var(--accent-glow);
+      font-size: 1.3rem;
+    }
+
+    /* ── Action Sheet ── */
+    .action-sheet-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      opacity: 0; visibility: hidden;
+      transition: opacity 0.28s ease, visibility 0.28s ease;
+      z-index: 200;
+    }
+    .action-sheet-overlay.show {
+      opacity: 1; visibility: visible;
+      backdrop-filter: blur(8px) saturate(1.6);
+      -webkit-backdrop-filter: blur(8px) saturate(1.6);
+    }
+    body.low-end .action-sheet-overlay.show {
+      backdrop-filter: none; -webkit-backdrop-filter: none;
+    }
+
+    .action-sheet, .haptics-sheet, .sort-sheet {
+      position: fixed; bottom: 0; left: 50%;
+      transform: translateX(-50%) translateY(100%);
+      width: 100%; max-width: 430px; max-height: 72vh;
+      display: flex; flex-direction: column;
+      background: #0d0d14;
+      border: 1px solid var(--glass-border);
+      border-bottom: none;
+      border-radius: 32px 32px 0 0;
+      padding: 24px;
+      padding-bottom: max(env(safe-area-inset-bottom), 24px);
+      z-index: 201;
+      transition: transform 0.3s ease;
+      box-shadow: none;
+      overflow: hidden;
+      will-change: transform;
+    }
+    .action-sheet::before, .haptics-sheet::before, .sort-sheet::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18) 30%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0.18) 70%, transparent);
+      pointer-events: none;
+    }
+    .action-sheet-scroll {
+      overflow-y: auto; flex: 1;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .action-sheet-scroll::-webkit-scrollbar { display: none; }
+    .action-sheet.show, .haptics-sheet.show, .sort-sheet.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .action-sheet-handle {
+      width: 36px; height: 4px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 2px;
+      margin: 0 auto 20px;
+    }
+    .action-sheet-title {
+      font-size: 1.05rem; font-weight: 700;
+      color: var(--text-p); margin-bottom: 16px;
+    }
+
+    .action-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      margin-bottom: 10px; cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+    .action-item:last-child { margin-bottom: 0; }
+    .action-item:active { transform: scale(0.98); }
+    .action-item-icon {
+      width: 42px; height: 42px; border-radius: 14px;
+      background: hsla(var(--accent-hue), 80%, 50%, 0.2);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .action-item-icon svg { width: 20px; height: 20px; stroke: hsl(var(--accent-hue), 80%, 70%); stroke-width: 2; }
+    #themeToggleIcon svg { transition: transform 0.4s ease; }
+    #themeToggleIcon.rotating svg { transform: rotate(180deg); }
+    .action-item-content { flex: 1; }
+    .action-item-title { font-size: 0.88rem; font-weight: 600; color: var(--text-p); margin-bottom: 2px; }
+    .action-item-subtitle { font-size: 0.75rem; color: var(--text-s); }
+    .action-item.destructive .action-item-icon { background: rgba(239,68,68,0.15); }
+    .action-item.destructive .action-item-icon svg { stroke: #ef4444; }
+    .action-item.destructive .action-item-title { color: #ef4444; }
+
+    /* Toggle Switch */
+    .toggle-switch { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: rgba(255,255,255,0.15);
+      border-radius: 13px; cursor: pointer; transition: all 0.3s ease;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      height: 20px; width: 20px; left: 3px; bottom: 3px;
+      background: white; border-radius: 50%;
+      transition: all 0.3s ease;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+    .toggle-switch input:checked + .toggle-slider {
+      background: hsla(var(--accent-hue), 80%, 55%, 0.8);
+    }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+    /* Haptics */
+    .haptics-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px; margin-bottom: 10px;
+    }
+    .haptics-label {
+      display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1;
+    }
+    .haptics-label input[type="checkbox"] {
+      width: 20px; height: 20px;
+      accent-color: hsl(var(--accent-hue), 80%, 60%);
+      cursor: pointer;
+    }
+    .haptics-label span { font-size: 0.875rem; color: var(--text-p); font-weight: 500; }
+    .intensity-container {
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px; margin-bottom: 10px;
+    }
+    .intensity-title { font-size: 0.875rem; color: var(--text-p); margin-bottom: 14px; font-weight: 600; }
+    .slider-wrapper { display: flex; align-items: center; gap: 12px; }
+    .slider {
+      flex: 1; height: 5px; border-radius: 3px;
+      background: rgba(255,255,255,0.1);
+      outline: none; -webkit-appearance: none; cursor: pointer;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: hsl(var(--accent-hue), 80%, 60%);
+      cursor: pointer;
+      box-shadow: 0 0 10px hsla(var(--accent-hue), 80%, 60%, 0.5);
+      border: 3px solid #0d0d14;
+    }
+    .slider::-moz-range-thumb {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: hsl(var(--accent-hue), 80%, 60%);
+      cursor: pointer; border: 3px solid #0d0d14;
+    }
+    .intensity-value { font-size: 0.82rem; color: var(--text-s); min-width: 46px; font-weight: 600; }
+
+    /* Sort Options */
+    .sort-option {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px; margin-bottom: 10px;
+      cursor: pointer; transition: all 0.2s ease;
+    }
+    .sort-option:active { transform: scale(0.98); }
+    .sort-option.active {
+      background: hsla(var(--accent-hue), 80%, 50%, 0.15);
+      border-color: hsla(var(--accent-hue), 80%, 60%, 0.4);
+    }
+    .sort-option.active .sort-option-text { color: hsl(var(--accent-hue), 80%, 75%); }
+    .sort-option.active .sort-option-desc { color: hsla(var(--accent-hue), 80%, 75%, 0.65); }
+    .sort-option-content { flex: 1; }
+    .sort-option-text { font-size: 0.875rem; font-weight: 600; color: var(--text-p); margin-bottom: 2px; }
+    .sort-option-desc { font-size: 0.75rem; color: var(--text-s); }
+    .sort-check {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid var(--glass-border);
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s ease;
+    }
+    .sort-option.active .sort-check {
+      border-color: hsl(var(--accent-hue), 80%, 60%);
+      background: hsla(var(--accent-hue), 80%, 60%, 0.2);
+    }
+    .sort-check svg { width: 12px; height: 12px; stroke: hsl(var(--accent-hue), 80%, 70%); stroke-width: 3; opacity: 0; }
+    .sort-option.active .sort-check svg { opacity: 1; }
+
+    /* Tooltips */
+    #qcTooltip, #rmTooltip {
+      display: none; position: fixed; bottom: 90px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10,10,20,0.97);
+      color: #e2e8f0; font-size: 0.8rem; font-weight: 500; line-height: 1.5;
+      padding: 12px 16px; border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      max-width: 280px; width: max-content; text-align: center;
+      z-index: 9999; pointer-events: none;
+    }
+
+    /* Tap scale animation */
+    .tap-scale { animation: tapScale 0.4s ease; }
+    @keyframes tapScale {
+      0% { transform: scale(1); }
+      50% { transform: scale(0.96); }
+      100% { transform: scale(1); }
+    }
+
+    @media (max-width: 375px) {
+      .bento-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+    }
+
+    /* ── Sheet Back Button ── */
+    .sheet-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 20px;
+    }
+    .sheet-back-btn {
+      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--glass-border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background 0.2s, transform 0.2s;
+      color: var(--text-p);
+      font-size: 0.8rem;
+    }
+    .sheet-back-btn:active { transform: scale(0.88); background: rgba(255,255,255,0.12); }
+    body.white-theme .sheet-back-btn { background: rgba(0,0,0,0.06); }
+    .sheet-header .action-sheet-title { margin-bottom: 0; }
+
+    /* ── Layout Sheet Rows ── */
+    .layout-option-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .layout-option-row:last-child { margin-bottom: 0; }
+    .layout-option-row:active { transform: scale(0.98); }
+    .layout-option-row.active {
+      background: hsla(var(--accent-hue), 80%, 50%, 0.15);
+      border-color: hsla(var(--accent-hue), 80%, 60%, 0.4);
+    }
+    .layout-option-row.active .sort-option-text { color: hsl(var(--accent-hue), 80%, 75%); }
+    .layout-option-row.active .sort-option-desc { color: hsla(var(--accent-hue), 80%, 75%, 0.65); }
+    .layout-option-row.active .sort-check { border-color: hsl(var(--accent-hue), 80%, 60%); background: hsla(var(--accent-hue), 80%, 60%, 0.2); }
+    .layout-option-row.active .sort-check svg { opacity: 1; stroke: hsl(var(--accent-hue), 80%, 70%); }
+    .layout-option-icon {
+      width: 42px; height: 42px; flex-shrink: 0;
+      border-radius: 14px;
+      background: hsla(var(--accent-hue), 80%, 50%, 0.1);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .layout-option-icon svg { width: 20px; height: 20px; stroke: hsl(var(--accent-hue), 80%, 70%); }
+    body.white-theme .layout-option-row { background: rgba(0,0,0,0.04); }
+
+    /* ── Action Sheet Categories ── */
+    .sheet-category-label {
+      font-size: 0.65rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 2px; color: var(--text-s);
+      padding: 0 4px; margin: 18px 0 8px;
+    }
+    .sheet-category-label:first-of-type { margin-top: 0; }
+
+    /* ── Layout Picker ── */
+    .layout-picker {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .layout-option {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 12px 6px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .layout-option:active { transform: scale(0.94); }
+    .layout-option svg { width: 22px; height: 22px; stroke: var(--text-s); transition: stroke 0.2s; }
+    .layout-option span {
+      font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--text-s); transition: color 0.2s;
+    }
+    .layout-option.active {
+      background: hsla(var(--accent-hue), 80%, 55%, 0.15);
+      border-color: hsla(var(--accent-hue), 80%, 60%, 0.45);
+    }
+    .layout-option.active svg { stroke: hsl(var(--accent-hue), 80%, 72%); }
+    .layout-option.active span { color: hsl(var(--accent-hue), 80%, 72%); }
+    body.white-theme .layout-option { background: rgba(0,0,0,0.04); }
+
+    /* ── Layout Variants ── */
+
+    /* Grid (default 2-col) */
+    .bento-grid.layout-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .bento-grid.layout-grid .glass-tile { min-height: 130px; border-radius: 32px; padding: 24px; }
+
+    /* List */
+    .bento-grid.layout-list {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .bento-grid.layout-list .glass-tile {
+      min-height: unset;
+      border-radius: 20px;
+      padding: 16px 20px;
+      display: flex; flex-direction: row;
+      align-items: center; gap: 16px;
+    }
+    .bento-grid.layout-list .glass-tile .tile-icon {
+      margin-bottom: 0; flex-shrink: 0;
+      width: 42px; height: 42px; border-radius: 14px;
+    }
+    .bento-grid.layout-list .glass-tile .tile-name { margin-bottom: 2px; font-size: 0.9rem; }
+    .bento-grid.layout-list .glass-tile .tile-status { font-size: 0.72rem; }
+
+    /* Bento (first item spans 2 cols) */
+    .bento-grid.layout-bento {
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .bento-grid.layout-bento .glass-tile { min-height: 120px; border-radius: 28px; padding: 22px; }
+    .bento-grid.layout-bento .glass-tile:first-child { grid-column: span 2; min-height: 100px; }
+
+    /* Compact (3-col small tiles) */
+    .bento-grid.layout-compact {
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+    .bento-grid.layout-compact .glass-tile {
+      min-height: 100px; border-radius: 22px; padding: 16px 12px;
+    }
+    .bento-grid.layout-compact .glass-tile .tile-icon {
+      width: 36px; height: 36px; border-radius: 12px;
+      font-size: 0.9rem; margin-bottom: 20px;
+    }
+    .bento-grid.layout-compact .glass-tile .tile-name { font-size: 0.75rem; }
+    .bento-grid.layout-compact .glass-tile .tile-status { font-size: 0.62rem; }
+
+    /* ── White Theme ── */
+    body.white-theme {
+      --bg: #f0f0f5;
+      --text-p: #0a0a12;
+      --text-s: rgba(10, 10, 18, 0.5);
+      --glass-fill: rgba(255, 255, 255, 0.65);
+      --glass-border: rgba(0, 0, 0, 0.1);
+      --specular: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, transparent 50%, rgba(255,255,255,0.4) 100%);
+      --bg-secondary: #ffffff;
+      --bg-card: rgba(255,255,255,0.7);
+      --bg-card-hover: rgba(245,245,255,0.9);
+      --text-primary: #0a0a12;
+      --text-secondary: rgba(10,10,18,0.55);
+      --text-muted: rgba(10,10,18,0.35);
+      --border-color: rgba(0,0,0,0.1);
+      --status-offline: rgba(0,0,0,0.25);
+      --status-checking: rgba(0,0,0,0.4);
+    }
+    body.white-theme .liquid-bg { opacity: 0.25; }
+    body.white-theme .dock { background: rgba(240,240,248,0.85); }
+    body.white-theme .action-sheet,
+    body.white-theme .haptics-sheet,
+    body.white-theme .sort-sheet,
+    body.white-theme #personalizeSheet { background: #f8f8fc; }
+    body.white-theme .search-input { color: #0a0a12; }
+    body.white-theme .search-input::placeholder { color: rgba(10,10,18,0.4); }
+
+    /* ── Personalize Sheet ── */
+    .personalize-section-label {
+      font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 2px; color: var(--text-s);
+      margin: 0 4px 10px;
+    }
+
+    .personalize-input-row {
+      display: flex; gap: 10px; align-items: center;
+    }
+    .personalize-input-wrap { flex: 1; }
+    .personalize-input {
+      width: 100%; padding: 13px 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      color: var(--text-p);
+      font-size: 0.9rem; font-family: inherit; font-weight: 500;
+      outline: none;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+    .personalize-input:focus {
+      border-color: hsla(var(--accent-hue), 80%, 60%, 0.6);
+      box-shadow: 0 0 0 3px hsla(var(--accent-hue), 80%, 60%, 0.1);
+    }
+    .personalize-input::placeholder { color: var(--text-s); }
+    body.white-theme .personalize-input { background: rgba(0,0,0,0.05); }
+
+    .personalize-save-btn {
+      padding: 13px 20px;
+      background: hsla(var(--accent-hue), 80%, 55%, 0.2);
+      border: 1px solid hsla(var(--accent-hue), 80%, 60%, 0.4);
+      border-radius: 100px;
+      color: hsl(var(--accent-hue), 80%, 75%);
+      font-size: 0.82rem; font-weight: 700; font-family: inherit;
+      cursor: pointer; white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+    .personalize-save-btn:active { transform: scale(0.95); }
+    .personalize-save-btn.saved {
+      background: hsla(140, 70%, 45%, 0.2);
+      border-color: hsla(140, 70%, 55%, 0.4);
+      color: hsl(140, 70%, 65%);
+    }
+
+    /* Theme swatches */
+    .theme-swatches {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .theme-swatch {
+      display: flex; flex-direction: column; align-items: center; gap: 7px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .theme-swatch:active { transform: scale(0.94); }
+    .swatch-preview {
+      width: 100%; aspect-ratio: 1.6;
+      border-radius: 16px;
+      border: 2px solid transparent;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .theme-swatch.active .swatch-preview {
+      border-color: hsl(var(--accent-hue), 80%, 65%);
+      box-shadow: 0 0 0 3px hsla(var(--accent-hue), 80%, 60%, 0.2);
+    }
+    .swatch-dynamic {
+      background: linear-gradient(135deg, hsl(240,80%,40%), hsl(280,80%,45%));
+    }
+    .swatch-custom {
+      background: linear-gradient(135deg, var(--custom-blob1, hsl(240,80%,40%)), var(--custom-blob2, hsl(280,80%,45%)));
+    }
+    .theme-swatch span {
+      font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--text-s);
+    }
+    .theme-swatch.active span { color: hsl(var(--accent-hue), 80%, 70%); }
+
+    /* Custom color pickers */
+    .color-picker-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      margin-bottom: 10px;
+    }
+    body.white-theme .color-picker-row { background: rgba(0,0,0,0.04); }
+    .color-picker-label {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.875rem; font-weight: 600; color: var(--text-p);
+    }
+    .color-blob-dot {
+      width: 20px; height: 20px; border-radius: 50%;
+      display: inline-block; flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .color-picker-input {
+      width: 44px; height: 36px;
+      border-radius: 12px; border: 1px solid var(--glass-border);
+      background: transparent; cursor: pointer; padding: 2px;
+      -webkit-appearance: none;
+    }
+    .color-picker-input::-webkit-color-swatch-wrapper { padding: 0; border-radius: 10px; }
+    .color-picker-input::-webkit-color-swatch { border: none; border-radius: 10px; }
+
+    /* blur layer no-op */
+    .blur-layer { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Background -->
+  <div class="liquid-bg">
+    <div class="blob" id="blob1" style="top: -10%; left: -10%; background: hsla(240, 80%, 50%, 0.3);"></div>
+    <div class="blob" id="blob2" style="bottom: -10%; right: -10%; background: hsla(280, 80%, 50%, 0.3);"></div>
+  </div>
+
+  <div class="app-shell">
+
+    <!-- Header -->
+    <header>
+      <div class="brand-logo">AADAconnect</div>
+      <div class="profile-orbit" id="searchToggleBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;stroke:var(--text-s);">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+      </div>
+    </header>
+
+    <!-- Search Container -->
+    <div class="search-container" id="searchContainer" style="display: none;">
+      <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search devices...">
+        <button class="clear-search" id="clearSearch">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="filter-chips">
+        <div class="chip active" data-filter="all">
+          <span>All</span>
+          <span class="chip-count" id="totalDevices">0</span>
+        </div>
+        <div class="chip" data-filter="online">
+          <span class="chip-dot"></span>
+          <span>Online</span>
+          <span class="chip-count" id="onlineDevices">0</span>
+        </div>
+        <div class="chip" data-filter="offline">
+          <span class="chip-dot"></span>
+          <span>Offline</span>
+          <span class="chip-count" id="offlineDevices">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero Card -->
+    <section class="liquid-card" id="hero-card">
+      <h1 id="greeting">Hello</h1>
+      <p id="status-desc">Connecting to your environment...</p>
+      <div class="hero-tags">
+        <div class="hero-tag">
+          <span id="mqttStatusHero" class="status-dot disconnected"></span>
+          <span id="userEmailHero" style="font-size:0.72rem;font-weight:700;letter-spacing:0.3px;">Loading...</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Devices Section -->
+    <div class="section-header">
+      <div class="section-tag">My Devices</div>
+      <button class="sort-btn" id="sortBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="7" y1="12" x2="21" y2="12"/><line x1="11" y1="18" x2="21" y2="18"/>
+        </svg>
+        <span id="sortLabel">Rank</span>
+      </button>
+    </div>
+
+    <div class="bento-grid" id="deviceGrid">
+      <div class="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Connecting to nodes...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Fluid Nav Dock -->
+  <div class="dock-wrapper">
+    <nav class="dock">
+      <div class="dock-item active"><i class="fa-solid fa-house-chimney-window"></i></div>
+      <div class="dock-item" id="searchDockBtn"><i class="fa-solid fa-magnifying-glass"></i></div>
+      <div class="dock-item action-fab" id="addDeviceBtn"><i class="fa-solid fa-plus"></i></div>
+      <div class="dock-item" id="personalizeDockBtn"><i class="fa-solid fa-palette"></i></div>
+      <div class="dock-item" id="moreOptionsDockBtn"><i class="fa-solid fa-ellipsis-vertical"></i></div>
+    </nav>
+  </div>
+
+  <!-- Overlay -->
+  <div class="action-sheet-overlay" id="actionSheetOverlay"></div>
+  <div class="blur-layer" id="blurLayer"></div>
+
+  <!-- Action Sheet -->
+  <div class="action-sheet" id="actionSheet" style="max-height:88vh;">
+    <div class="action-sheet-handle"></div>
+    <div class="action-sheet-title">Settings</div>
+    <div class="action-sheet-scroll">
+
+      <!-- ── Control ── -->
+      <div class="sheet-category-label">Control</div>
+
+      <div class="action-item" id="refreshItem">
+        <div class="action-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </div>
+        <div class="action-item-content">
+          <div class="action-item-title">Refresh Devices</div>
+          <div class="action-item-subtitle">Ping all devices for latest status</div>
+        </div>
+      </div>
+
+      <div class="action-item" id="quickControlItem" style="cursor:default;">
+        <div class="action-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+          </svg>
+        </div>
+        <div class="action-item-content">
+          <div class="action-item-title" style="display:flex;align-items:center;gap:6px;">
+            Quick Device Control
+            <span id="qcInfoBtn" title="Hold to learn more" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(148,163,184,0.2);color:rgba(255,255,255,0.4);font-size:10px;font-weight:700;font-style:italic;font-family:Georgia,serif;cursor:pointer;flex-shrink:0;user-select:none;-webkit-user-select:none;">i</span>
+          </div>
+          <div class="action-item-subtitle">Swipe cards to toggle power</div>
+        </div>
+        <label class="toggle-switch" onclick="event.stopPropagation()">
+          <input type="checkbox" id="quickControlToggle" onchange="toggleQuickControl(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div id="qcTooltip">💡 Swipe a device card <strong>left</strong> to reveal quick power controls</div>
+
+      <!-- ── Appearance ── -->
+      <div class="sheet-category-label">Appearance</div>
+
+      <div class="action-item" id="themeToggleItem">
+        <div class="action-item-icon" id="themeToggleIcon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </div>
+        <div class="action-item-content">
+          <div class="action-item-title">White Theme</div>
+          <div class="action-item-subtitle">Switch between dark and light mode</div>
+        </div>
+      </div>
+
+      <!-- Device Layout -->
+      <div class="action-item" id="layoutItem">
+        <div class="action-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+          </svg>
+        </div>
+        <div class="action-item-content">
+          <div class="action-item-title">Device Layout</div>
+          <div class="action-item-subtitle" id="layoutSubtitle">Choose how devices are displayed</div>
+        </div>
+        <i class="fa-solid fa-chevron-right" style="font-size:0.75rem;color:var(--text-s);"></i>
+      </div>
+
+      <div class="action-item" id="hapticsItem">
+        <div class="action-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+          </svg>
+        </div>
+        <div class="action-item-content">
+          <div class="action-item-title">Haptic Feedback</div>
+          <div class="action-item-subtitle">Configure vibration settings</div>
+        </div>
+      </div>
+
+      <!-- ── Account ── -->
+      <div class="sheet-category-label">Account</div>
+
+      <div class="action-item" id="rememberMeItem" style="cursor:default;">
+        <div class="action-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <div class="action-item-content">
+          <div class="action-item-title" style="display:flex;align-items:center;gap:6px;">
+            Remember Me
+            <span id="rmInfoBtn" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(148,163,184,0.2);color:rgba(255,255,255,0.4);font-size:10px;font-weight:700;font-style:italic;font-family:Georgia,serif;cursor:pointer;flex-shrink:0;user-select:none;-webkit-user-select:none;">i</span>
+          </div>
+          <div class="action-item-subtitle">Stay logged in automatically</div>
+        </div>
+        <label class="toggle-switch" onclick="event.stopPropagation()">
+          <input type="checkbox" id="rememberMeToggle" onchange="toggleRememberMe(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div id="rmTooltip">🔐 Skip the login screen and jump straight into the dashboard on your next visit</div>
+
+      <div class="action-item destructive" id="logoutItem">
+        <div class="action-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </div>
+        <div class="action-item-content">
+          <div class="action-item-title">Logout</div>
+          <div class="action-item-subtitle">Sign out of your account</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Haptics Sheet -->
+  <div class="haptics-sheet" id="hapticsSheet">
+    <div class="action-sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back-btn" id="hapticsBackBtn"><i class="fa-solid fa-chevron-left"></i></div>
+      <div class="action-sheet-title">Haptic Settings</div>
+    </div>
+    <div class="haptics-item">
+      <label class="haptics-label">
+        <input type="checkbox" id="hapticsController">
+        <span>Controller on/off button</span>
+      </label>
+    </div>
+    <div class="haptics-item">
+      <label class="haptics-label">
+        <input type="checkbox" id="hapticsAll">
+        <span>All buttons</span>
+      </label>
+    </div>
+    <div class="intensity-container">
+      <div class="intensity-title">Haptic Intensity</div>
+      <div class="slider-wrapper">
+        <input type="range" id="hapticsIntensity" min="10" max="200" step="10" value="50" class="slider">
+        <span class="intensity-value" id="intensityValue">50ms</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sort Sheet -->
+  <div class="sort-sheet" id="sortSheet">
+    <div class="action-sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back-btn" id="sortBackBtn"><i class="fa-solid fa-chevron-left"></i></div>
+      <div class="action-sheet-title">Sort Devices</div>
+    </div>
+    <div class="sort-option active" data-sort="rank">
+      <div class="sort-option-content">
+        <div class="sort-option-text">By Rank</div>
+        <div class="sort-option-desc">Ordered by device rank number</div>
+      </div>
+      <div class="sort-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+    <div class="sort-option" data-sort="name">
+      <div class="sort-option-content">
+        <div class="sort-option-text">By Name</div>
+        <div class="sort-option-desc">Alphabetical order</div>
+      </div>
+      <div class="sort-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+    <div class="sort-option" data-sort="status">
+      <div class="sort-option-content">
+        <div class="sort-option-text">By Status</div>
+        <div class="sort-option-desc">Online devices first</div>
+      </div>
+      <div class="sort-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+    <div class="sort-option" data-sort="recent">
+      <div class="sort-option-content">
+        <div class="sort-option-text">Recently Added</div>
+        <div class="sort-option-desc">Newest devices first</div>
+      </div>
+      <div class="sort-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layout Sheet -->
+  <div class="sort-sheet" id="layoutSheet">
+    <div class="action-sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back-btn" id="layoutBackBtn"><i class="fa-solid fa-chevron-left"></i></div>
+      <div class="action-sheet-title">Device Layout</div>
+    </div>
+
+    <div class="layout-option-row" data-layout="grid">
+      <div class="layout-option-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/>
+          <rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>
+        </svg>
+      </div>
+      <div class="sort-option-content">
+        <div class="sort-option-text">Grid</div>
+        <div class="sort-option-desc">2-column equal tiles</div>
+      </div>
+      <div class="sort-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+
+    <div class="layout-option-row" data-layout="list">
+      <div class="layout-option-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="4" rx="1"/>
+          <rect x="3" y="10" width="18" height="4" rx="1"/>
+          <rect x="3" y="16" width="18" height="4" rx="1"/>
+        </svg>
+      </div>
+      <div class="sort-option-content">
+        <div class="sort-option-text">List</div>
+        <div class="sort-option-desc">Full-width rows, icon on the left</div>
+      </div>
+      <div class="sort-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+
+    <div class="layout-option-row" data-layout="bento">
+      <div class="layout-option-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="10" height="10" rx="1"/>
+          <rect x="15" y="3" width="6" height="4" rx="1"/>
+          <rect x="15" y="9" width="6" height="4" rx="1"/>
+          <rect x="3" y="15" width="6" height="6" rx="1"/>
+          <rect x="11" y="15" width="10" height="6" rx="1"/>
+        </svg>
+      </div>
+      <div class="sort-option-content">
+        <div class="sort-option-text">Bento</div>
+        <div class="sort-option-desc">First card spans full width</div>
+      </div>
+      <div class="sort-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+
+    <div class="layout-option-row" data-layout="compact">
+      <div class="layout-option-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="5" height="5" rx="1"/><rect x="10" y="3" width="5" height="5" rx="1"/><rect x="17" y="3" width="4" height="5" rx="1"/>
+          <rect x="3" y="10" width="5" height="5" rx="1"/><rect x="10" y="10" width="5" height="5" rx="1"/><rect x="17" y="10" width="4" height="5" rx="1"/>
+          <rect x="3" y="17" width="5" height="4" rx="1"/><rect x="10" y="17" width="5" height="4" rx="1"/><rect x="17" y="17" width="4" height="4" rx="1"/>
+        </svg>
+      </div>
+      <div class="sort-option-content">
+        <div class="sort-option-text">Compact</div>
+        <div class="sort-option-desc">3-column dense grid</div>
+      </div>
+      <div class="sort-check">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Personalize Sheet -->
+  <div class="action-sheet" id="personalizeSheet" style="max-height: 85vh;">
+    <div class="action-sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back-btn" id="personalizeBackBtn"><i class="fa-solid fa-chevron-left"></i></div>
+      <div class="action-sheet-title">Personalize</div>
+    </div>
+    <div class="action-sheet-scroll">
+
+      <!-- Display Name -->
+      <div class="personalize-section-label">Display Name</div>
+      <div class="personalize-input-row">
+        <div class="personalize-input-wrap">
+          <input type="text" id="displayNameInput" class="personalize-input" placeholder="Enter your name…" maxlength="24">
+        </div>
+        <button class="personalize-save-btn" id="saveDisplayName">Save</button>
+      </div>
+
+      <!-- Background Theme -->
+      <div class="personalize-section-label" style="margin-top:20px;">Background Theme</div>
+
+      <!-- Preset swatches -->
+      <div class="theme-swatches" id="themeSwatches">
+        <div class="theme-swatch active" data-preset="dynamic" title="Dynamic">
+          <div class="swatch-preview swatch-dynamic"></div>
+          <span>Dynamic</span>
+        </div>
+        <div class="theme-swatch" data-preset="ocean" title="Ocean">
+          <div class="swatch-preview" style="background:linear-gradient(135deg,hsl(200,80%,40%),hsl(160,80%,40%));"></div>
+          <span>Ocean</span>
+        </div>
+        <div class="theme-swatch" data-preset="sunset" title="Sunset">
+          <div class="swatch-preview" style="background:linear-gradient(135deg,hsl(15,90%,50%),hsl(320,80%,50%));"></div>
+          <span>Sunset</span>
+        </div>
+        <div class="theme-swatch" data-preset="forest" title="Forest">
+          <div class="swatch-preview" style="background:linear-gradient(135deg,hsl(130,70%,35%),hsl(170,70%,35%));"></div>
+          <span>Forest</span>
+        </div>
+        <div class="theme-swatch" data-preset="aurora" title="Aurora">
+          <div class="swatch-preview" style="background:linear-gradient(135deg,hsl(270,80%,50%),hsl(180,80%,50%));"></div>
+          <span>Aurora</span>
+        </div>
+        <div class="theme-swatch" data-preset="custom" title="Custom">
+          <div class="swatch-preview swatch-custom" id="customSwatchPreview"></div>
+          <span>Custom</span>
+        </div>
+      </div>
+
+      <!-- Custom color pickers (shown when "Custom" selected) -->
+      <div id="customColorPanel" style="display:none;">
+        <div class="color-picker-row">
+          <div class="color-picker-label">
+            <span class="color-blob-dot" id="blob1Dot"></span>
+            <span>Blob 1 Color</span>
+          </div>
+          <input type="color" id="blob1ColorPicker" class="color-picker-input" value="#5533ff">
+        </div>
+        <div class="color-picker-row">
+          <div class="color-picker-label">
+            <span class="color-blob-dot" id="blob2Dot"></span>
+            <span>Blob 2 Color</span>
+          </div>
+          <input type="color" id="blob2ColorPicker" class="color-picker-input" value="#8833ff">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ── Low-end device detection ──
+    (function() {
+      if (navigator.hardwareConcurrency <= 4) document.body.classList.add('low-end');
+    })();
+
+    // ── Haptics ──
+    function hapticFeedback(duration) {
+      if ('vibrate' in navigator && duration > 0) navigator.vibrate(duration);
+    }
+    function getHapticIntensity() {
+      const saved = localStorage.getItem('hapticsIntensity');
+      return saved ? parseInt(saved) : 50;
+    }
+    function shouldHapticAll() { return localStorage.getItem('hapticsAll') === 'true'; }
+    function shouldHapticController() { return localStorage.getItem('hapticsController') === 'true'; }
+    function addHapticToElement(element, callback) {
+      element.addEventListener('click', function(e) {
+        if (shouldHapticAll()) hapticFeedback(getHapticIntensity());
+        if (callback) callback(e);
+      });
+    }
+
+    // ── Global State ──
+    let mqttClient = null;
+    let devices = [];
+    let currentUser = null;
+    let deviceOnlineStatus = {};
+    let deviceTimeouts = {};
+    let deviceListTimeout = null;
+    let renderTimeout = null;
+    let currentSortBy = localStorage.getItem('sortBy') || 'rank';
+    let currentFilter = 'all';
+    let searchQuery = '';
+    let devicePowerStatus = {};
+    let deviceSwipeState = {};
+
+    // ── Init ──
+    function init() {
+      currentUser = JSON.parse(sessionStorage.getItem('current_user') || 'null');
+      if (!currentUser) {
+        const remembered = localStorage.getItem('remembered_user');
+        if (remembered) {
+          try {
+            currentUser = JSON.parse(remembered);
+            sessionStorage.setItem('current_user', remembered);
+          } catch(e) { currentUser = null; }
+        }
+      }
+      if (!currentUser) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      document.getElementById('userEmailHero').textContent = currentUser.email;
+      loadTheme();
+      updateLiquidTheme();
+      loadSavedPreset();
+      loadLayout();
+      setupEventListeners();
+      setupPersonalizeListeners();
+      connectMQTT();
+      loadHapticsSettings();
+      currentSortBy = localStorage.getItem('sortBy') || 'rank';
+      updateSortLabel();
+      document.querySelectorAll('.sort-option').forEach(o => o.classList.remove('active'));
+      const activeSortOption = document.querySelector(`.sort-option[data-sort="${currentSortBy}"]`);
+      if (activeSortOption) activeSortOption.classList.add('active');
+      const qcEnabled = localStorage.getItem('quickControl') === 'true';
+      document.getElementById('quickControlToggle').checked = qcEnabled;
+      const rmEnabled = localStorage.getItem('rememberMe') === 'true';
+      document.getElementById('rememberMeToggle').checked = rmEnabled;
+    }
+
+    // ── Liquid Theme (time-based) ──
+    function updateLiquidTheme() {
+      const hour = new Date().getHours();
+      const blob1 = document.getElementById('blob1');
+      const blob2 = document.getElementById('blob2');
+      const greet = document.getElementById('greeting');
+      const desc  = document.getElementById('status-desc');
+
+      const savedName = localStorage.getItem('displayName');
+      const name = savedName || (currentUser ? currentUser.email.split('@')[0] : '');
+
+      let hue1, hue2, greetMsg, descMsg;
+
+      if (hour >= 5 && hour < 11) {
+        hue1 = 40; hue2 = 15;
+        greetMsg = `Morning, ${name}`;
+        descMsg = "The sun is rising. Your natural light sequence has begun.";
+      } else if (hour >= 11 && hour < 17) {
+        hue1 = 200; hue2 = 160;
+        greetMsg = `Good Day, ${name}`;
+        descMsg = "Solar efficiency is at 94%. Energy storage is nearly full.";
+      } else if (hour >= 17 && hour < 21) {
+        hue1 = 280; hue2 = 320;
+        greetMsg = `Evening, ${name}`;
+        descMsg = "Sunlight is fading. Deep Focus mode is recommended.";
+      } else {
+        hue1 = 240; hue2 = 260;
+        greetMsg = `Night, ${name}`;
+        descMsg = "All nodes are silent. Rest well, your home is watching.";
+      }
+
+      greet.innerText = greetMsg;
+      desc.innerText = descMsg;
+
+      // Only update blobs if preset is dynamic
+      const preset = localStorage.getItem('bgPreset') || 'dynamic';
+      if (preset === 'dynamic') {
+        document.documentElement.style.setProperty('--accent-hue', hue1);
+        blob1.style.background = `hsla(${hue1}, 80%, 50%, 0.3)`;
+        blob2.style.background = `hsla(${hue2}, 80%, 50%, 0.3)`;
+      }
+    }
+
+    // ── Event Listeners ──
+    function setupEventListeners() {
+      addHapticToElement(document.getElementById('moreOptionsDockBtn'), showActionSheet);
+      addHapticToElement(document.getElementById('addDeviceBtn'), addDevice);
+      addHapticToElement(document.getElementById('searchToggleBtn'), toggleSearch);
+      addHapticToElement(document.getElementById('searchDockBtn'), toggleSearch);
+      addHapticToElement(document.getElementById('sortBtn'), showSortSheet);
+
+      document.getElementById('actionSheetOverlay').addEventListener('click', closeAllSheets);
+
+      addHapticToElement(document.getElementById('refreshItem'), refreshDevices);
+      addHapticToElement(document.getElementById('themeToggleItem'), toggleTheme);
+      addHapticToElement(document.getElementById('hapticsItem'), showHapticsSheet);
+      addHapticToElement(document.getElementById('layoutItem'), showLayoutSheet);
+      addHapticToElement(document.getElementById('logoutItem'), logout);
+
+      // Back buttons
+      document.getElementById('hapticsBackBtn').addEventListener('click', () => { closeAllSheets(); openSheet('actionSheet'); });
+      document.getElementById('sortBackBtn').addEventListener('click', closeAllSheets);
+      document.getElementById('layoutBackBtn').addEventListener('click', () => { closeAllSheets(); openSheet('actionSheet'); });
+      document.getElementById('personalizeBackBtn').addEventListener('click', closeAllSheets);
+
+      // Layout sheet rows
+      document.querySelectorAll('.layout-option-row').forEach(row => {
+        addHapticToElement(row, () => {
+          applyLayout(row.dataset.layout);
+          setTimeout(closeAllSheets, 280);
+        });
+      });
+
+      document.getElementById('hapticsIntensity').addEventListener('input', function() {
+        updateIntensityDisplay();
+        saveHapticsSettings();
+        hapticFeedback(parseInt(this.value));
+      });
+      document.getElementById('hapticsController').addEventListener('change', saveHapticsSettings);
+      document.getElementById('hapticsAll').addEventListener('change', saveHapticsSettings);
+
+      const searchInput = document.getElementById('searchInput');
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value.toLowerCase();
+        document.getElementById('clearSearch').classList.toggle('show', searchQuery.length > 0);
+        renderDevices();
+      });
+      document.getElementById('clearSearch').addEventListener('click', () => {
+        searchInput.value = ''; searchQuery = '';
+        document.getElementById('clearSearch').classList.remove('show');
+        renderDevices();
+      });
+
+      document.querySelectorAll('.chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          currentFilter = chip.dataset.filter;
+          renderDevices();
+        });
+      });
+
+      document.querySelectorAll('.sort-option').forEach(option => {
+        addHapticToElement(option, () => {
+          document.querySelectorAll('.sort-option').forEach(o => o.classList.remove('active'));
+          option.classList.add('active');
+          currentSortBy = option.dataset.sort;
+          localStorage.setItem('sortBy', currentSortBy);
+          updateSortLabel();
+          renderDevices();
+          setTimeout(hideSortSheet, 300);
+        });
+      });
+
+      // Parallax on mouse
+      document.addEventListener('mousemove', (e) => {
+        const x = (e.clientX / window.innerWidth - 0.5) * 40;
+        const y = (e.clientY / window.innerHeight - 0.5) * 40;
+        document.getElementById('blob1').style.transform = `translate(${x}px, ${y}px)`;
+        document.getElementById('blob2').style.transform = `translate(${-x}px, ${-y}px)`;
+        const card = document.getElementById('hero-card');
+        card.style.transform = `perspective(1000px) rotateX(${-y/10}deg) rotateY(${x/10}deg)`;
+      });
+    }
+
+    function showLayoutSheet() {
+      closeAllSheets();
+      const saved = localStorage.getItem('deviceLayout') || 'grid';
+      document.querySelectorAll('.layout-option-row').forEach(r => r.classList.remove('active'));
+      const active = document.querySelector(`.layout-option-row[data-layout="${saved}"]`);
+      if (active) active.classList.add('active');
+      openSheet('layoutSheet');
+    }
+
+    // ── Device Layout ──
+    function applyLayout(layout) {
+      const grid = document.getElementById('deviceGrid');
+      grid.className = `bento-grid layout-${layout}`;
+      // Sync sheet rows
+      document.querySelectorAll('.layout-option-row').forEach(r => r.classList.remove('active'));
+      const activeRow = document.querySelector(`.layout-option-row[data-layout="${layout}"]`);
+      if (activeRow) activeRow.classList.add('active');
+      // Update subtitle in action sheet
+      const labels = { grid: 'Grid', list: 'List', bento: 'Bento', compact: 'Compact' };
+      const sub = document.getElementById('layoutSubtitle');
+      if (sub) sub.textContent = labels[layout] || 'Choose how devices are displayed';
+      localStorage.setItem('deviceLayout', layout);
+    }
+
+    function loadLayout() {
+      applyLayout(localStorage.getItem('deviceLayout') || 'grid');
+    }
+
+    // ── Theme toggle → white mode ──
+    function toggleTheme() {
+      const icon = document.getElementById('themeToggleIcon');
+      icon.classList.add('rotating');
+      const isWhite = document.body.classList.toggle('white-theme');
+      localStorage.setItem('whiteTheme', isWhite ? 'true' : 'false');
+      setTimeout(() => { icon.classList.remove('rotating'); hideActionSheet(); }, 400);
+    }
+
+    function loadTheme() {
+      if (localStorage.getItem('whiteTheme') === 'true') document.body.classList.add('white-theme');
+    }
+
+    // ── Personalize ──
+    const PRESETS = {
+      dynamic: null, // handled by updateLiquidTheme
+      ocean:   { h1: 200, h2: 160 },
+      sunset:  { h1: 15,  h2: 320 },
+      forest:  { h1: 130, h2: 170 },
+      aurora:  { h1: 270, h2: 180 },
+      custom:  null  // uses custom picker colors
+    };
+
+    function applyBlobColors(blob1Color, blob2Color, accentHue) {
+      const b1 = document.getElementById('blob1');
+      const b2 = document.getElementById('blob2');
+      b1.style.background = blob1Color;
+      b2.style.background = blob2Color;
+      if (accentHue !== undefined) {
+        document.documentElement.style.setProperty('--accent-hue', accentHue);
+      }
+    }
+
+    function applyPreset(preset) {
+      const blob1 = document.getElementById('blob1');
+      const blob2 = document.getElementById('blob2');
+
+      // Mark swatch active
+      document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+      document.querySelector(`.theme-swatch[data-preset="${preset}"]`).classList.add('active');
+
+      const customPanel = document.getElementById('customColorPanel');
+
+      if (preset === 'dynamic') {
+        customPanel.style.display = 'none';
+        localStorage.setItem('bgPreset', 'dynamic');
+        updateLiquidTheme(); // restore time-based
+      } else if (preset === 'custom') {
+        customPanel.style.display = 'block';
+        localStorage.setItem('bgPreset', 'custom');
+        applyCustomColors();
+      } else {
+        customPanel.style.display = 'none';
+        localStorage.setItem('bgPreset', preset);
+        const p = PRESETS[preset];
+        document.documentElement.style.setProperty('--accent-hue', p.h1);
+        blob1.style.background = `hsla(${p.h1}, 80%, 50%, 0.3)`;
+        blob2.style.background = `hsla(${p.h2}, 80%, 50%, 0.3)`;
+      }
+    }
+
+    function applyCustomColors() {
+      const c1 = localStorage.getItem('customBlob1') || '#5533ff';
+      const c2 = localStorage.getItem('customBlob2') || '#8833ff';
+      document.getElementById('blob1ColorPicker').value = c1;
+      document.getElementById('blob2ColorPicker').value = c2;
+      // derive hue from hex for accent
+      const hue = hexToHue(c1);
+      document.documentElement.style.setProperty('--accent-hue', hue);
+      document.getElementById('blob1').style.background = hexToBlob(c1);
+      document.getElementById('blob2').style.background = hexToBlob(c2);
+      updateCustomSwatchPreview(c1, c2);
+      document.getElementById('blob1Dot').style.background = c1;
+      document.getElementById('blob2Dot').style.background = c2;
+    }
+
+    function hexToBlob(hex) {
+      // convert hex to hsla string with opacity 0.3
+      const r = parseInt(hex.slice(1,3),16)/255;
+      const g = parseInt(hex.slice(3,5),16)/255;
+      const b = parseInt(hex.slice(5,7),16)/255;
+      const max=Math.max(r,g,b), min=Math.min(r,g,b);
+      let h=0, s=0, l=(max+min)/2;
+      if(max!==min){const d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;}h/=6;}
+      return `hsla(${Math.round(h*360)},${Math.round(s*100)}%,50%,0.3)`;
+    }
+
+    function hexToHue(hex) {
+      const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+      const max=Math.max(r,g,b), min=Math.min(r,g,b); let h=0;
+      if(max!==min){const d=max-min;switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;}h/=6;}
+      return Math.round(h*360);
+    }
+
+    function updateCustomSwatchPreview(c1, c2) {
+      const el = document.getElementById('customSwatchPreview');
+      if (el) {
+        el.style.background = `linear-gradient(135deg, ${c1}, ${c2})`;
+        document.documentElement.style.setProperty('--custom-blob1', c1);
+        document.documentElement.style.setProperty('--custom-blob2', c2);
+      }
+    }
+
+    function loadSavedPreset() {
+      const preset = localStorage.getItem('bgPreset') || 'dynamic';
+      if (preset === 'dynamic') {
+        // handled by updateLiquidTheme in init
+        document.querySelector('.theme-swatch[data-preset="dynamic"]').classList.add('active');
+      } else if (preset === 'custom') {
+        applyCustomColors();
+        document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+        document.querySelector('.theme-swatch[data-preset="custom"]').classList.add('active');
+        document.getElementById('customColorPanel').style.display = 'block';
+      } else {
+        applyPreset(preset);
+      }
+    }
+
+    function openPersonalizeSheet() {
+      // Populate name field
+      const savedName = localStorage.getItem('displayName') || '';
+      document.getElementById('displayNameInput').value = savedName;
+      // Show correct swatch state
+      const preset = localStorage.getItem('bgPreset') || 'dynamic';
+      document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+      const activeSwatch = document.querySelector(`.theme-swatch[data-preset="${preset}"]`);
+      if (activeSwatch) activeSwatch.classList.add('active');
+      document.getElementById('customColorPanel').style.display = preset === 'custom' ? 'block' : 'none';
+      if (preset === 'custom') applyCustomColors();
+      // Update custom swatch preview with saved colors
+      const c1 = localStorage.getItem('customBlob1') || '#5533ff';
+      const c2 = localStorage.getItem('customBlob2') || '#8833ff';
+      updateCustomSwatchPreview(c1, c2);
+      openSheet('personalizeSheet');
+    }
+
+    function setupPersonalizeListeners() {
+      // Dock button
+      addHapticToElement(document.getElementById('personalizeDockBtn'), openPersonalizeSheet);
+
+      // Save display name
+      document.getElementById('saveDisplayName').addEventListener('click', function() {
+        const val = document.getElementById('displayNameInput').value.trim();
+        if (val) {
+          localStorage.setItem('displayName', val);
+          // Update greetings
+          const hour = new Date().getHours();
+          let prefix = hour >= 5 && hour < 11 ? 'Morning' : hour >= 11 && hour < 17 ? 'Good Day' : hour >= 17 && hour < 21 ? 'Evening' : 'Night';
+          document.getElementById('greeting').innerText = `${prefix}, ${val}`;
+        }
+        const btn = this;
+        btn.textContent = '✓ Saved';
+        btn.classList.add('saved');
+        setTimeout(() => { btn.textContent = 'Save'; btn.classList.remove('saved'); }, 1800);
+      });
+
+      // Enter key saves name
+      document.getElementById('displayNameInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('saveDisplayName').click(); }
+      });
+
+      // Swatch clicks
+      document.querySelectorAll('.theme-swatch').forEach(swatch => {
+        swatch.addEventListener('click', () => applyPreset(swatch.dataset.preset));
+      });
+
+      // Custom color pickers
+      document.getElementById('blob1ColorPicker').addEventListener('input', function() {
+        const c1 = this.value;
+        const c2 = document.getElementById('blob2ColorPicker').value;
+        localStorage.setItem('customBlob1', c1);
+        document.getElementById('blob1').style.background = hexToBlob(c1);
+        document.documentElement.style.setProperty('--accent-hue', hexToHue(c1));
+        document.getElementById('blob1Dot').style.background = c1;
+        updateCustomSwatchPreview(c1, c2);
+      });
+
+      document.getElementById('blob2ColorPicker').addEventListener('input', function() {
+        const c2 = this.value;
+        const c1 = document.getElementById('blob1ColorPicker').value;
+        localStorage.setItem('customBlob2', c2);
+        document.getElementById('blob2').style.background = hexToBlob(c2);
+        document.getElementById('blob2Dot').style.background = c2;
+        updateCustomSwatchPreview(c1, c2);
+      });
+    }
+
+    // ── Search ──
+    function toggleSearch() {
+      const container = document.getElementById('searchContainer');
+      const isVisible = container.style.display !== 'none';
+      container.style.display = isVisible ? 'none' : 'block';
+      if (!isVisible) document.getElementById('searchInput').focus();
+      else { document.getElementById('searchInput').value = ''; searchQuery = ''; renderDevices(); }
+    }
+
+    // ── Sheet System ──
+    function openSheet(sheetId) {
+      document.getElementById('actionSheetOverlay').classList.add('show');
+      document.getElementById(sheetId).classList.add('show');
+    }
+    function closeAllSheets() {
+      document.getElementById('actionSheetOverlay').classList.remove('show');
+      ['actionSheet','hapticsSheet','sortSheet','layoutSheet','personalizeSheet'].forEach(id =>
+        document.getElementById(id).classList.remove('show')
+      );
+    }
+    function showBlurLayer() {} function hideBlurLayer() {}
+    function showActionSheet() { openSheet('actionSheet'); }
+    function hideActionSheet() { closeAllSheets(); }
+    function showHapticsSheet() { closeAllSheets(); loadHapticsSettings(); updateIntensityDisplay(); openSheet('hapticsSheet'); }
+    function hideHapticsSheet() { closeAllSheets(); }
+    function showSortSheet() {
+      document.querySelectorAll('.sort-option').forEach(o => o.classList.remove('active'));
+      document.querySelector(`.sort-option[data-sort="${currentSortBy}"]`).classList.add('active');
+      openSheet('sortSheet');
+    }
+    function hideSortSheet() { closeAllSheets(); }
+
+    function updateSortLabel() {
+      const labels = { rank: 'Rank', name: 'Name', status: 'Status', recent: 'Recent' };
+      document.getElementById('sortLabel').textContent = labels[currentSortBy] || 'Rank';
+    }
+
+    // ── Haptics Settings ──
+    function loadHapticsSettings() {
+      document.getElementById('hapticsController').checked = localStorage.getItem('hapticsController') === 'true';
+      document.getElementById('hapticsAll').checked = localStorage.getItem('hapticsAll') === 'true';
+      document.getElementById('hapticsIntensity').value = getHapticIntensity();
+      updateIntensityDisplay();
+    }
+    function updateIntensityDisplay() {
+      document.getElementById('intensityValue').textContent = document.getElementById('hapticsIntensity').value + 'ms';
+    }
+    function saveHapticsSettings() {
+      localStorage.setItem('hapticsController', document.getElementById('hapticsController').checked);
+      localStorage.setItem('hapticsAll', document.getElementById('hapticsAll').checked);
+      localStorage.setItem('hapticsIntensity', document.getElementById('hapticsIntensity').value);
+    }
+
+    // ── MQTT ──
+    function connectMQTT() {
+      try {
+        mqttClient = mqtt.connect('wss://y1dda1f8.ala.asia-southeast1.emqxsl.com:8084/mqtt', {
+          username: 'AADAconnect',
+          password: 'wMhtXcU86UtV-48'
+        });
+        mqttClient.on('connect', () => {
+          document.getElementById('mqttStatusHero').className = 'status-dot connected';
+          const fetchTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/fetch`;
+          mqttClient.subscribe(fetchTopic, (err) => {
+            if (!err) {
+              deviceListTimeout = setTimeout(() => {
+                if (devices.length === 0) renderDevices();
+              }, 5000);
+            }
+          });
+        });
+        mqttClient.on('message', (topic, message) => handleMQTTMessage(topic, message));
+        mqttClient.on('error', () => { document.getElementById('mqttStatusHero').className = 'status-dot disconnected'; if (devices.length === 0) renderDevices(); });
+        mqttClient.on('close', () => { document.getElementById('mqttStatusHero').className = 'status-dot disconnected'; if (devices.length === 0) renderDevices(); });
+      } catch(error) {
+        renderDevices();
+      }
+    }
+
+    function handleMQTTMessage(topic, message) {
+      const topicParts = topic.split('/');
+      try {
+        const data = JSON.parse(message.toString());
+        if (data.device_list && Array.isArray(data.device_list)) {
+          clearTimeout(deviceListTimeout);
+          devices = data.device_list;
+          renderDevices();
+          devices.forEach(device => {
+            const statusTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${device.device_id}/status`;
+            mqttClient.subscribe(statusTopic);
+            const ofTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${device.device_id}/OF`;
+            mqttClient.subscribe(ofTopic);
+          });
+          checkAllDevicesStatus();
+        }
+      } catch(e) {}
+
+      if (topicParts[topicParts.length - 1] === 'OF') {
+        const deviceId = topicParts[topicParts.length - 2];
+        const rawMessage = message.toString().trim();
+        const lowerMessage = rawMessage.toLowerCase();
+        if (lowerMessage === 'check_status') return;
+        if (deviceTimeouts[deviceId]) { clearTimeout(deviceTimeouts[deviceId]); delete deviceTimeouts[deviceId]; }
+        const displayMessage = (lowerMessage === 'offline') ? 'offline' : rawMessage;
+        deviceOnlineStatus[deviceId] = displayMessage;
+        const isOnline = lowerMessage !== 'offline';
+        updateDeviceOnlineStatus(deviceId, displayMessage, isOnline);
+      }
+
+      if (topicParts[topicParts.length - 1] === 'status') {
+        const deviceId = topicParts[topicParts.length - 2];
+        const status = message.toString().trim().toUpperCase();
+        if (status === 'ON' || status === 'OFF') {
+          devicePowerStatus[deviceId] = status;
+          document.querySelectorAll(`.glass-tile[data-device-id="${deviceId}"]`).forEach(card => {
+            const isOnline = deviceOnlineStatus[deviceId] !== 'offline' && deviceOnlineStatus[deviceId] !== 'Checking...';
+            updateQcPanel(card, deviceId, isOnline);
+          });
+        }
+      }
+    }
+
+    // ── Stats ──
+    function updateStats() {
+      const total = devices.length;
+      const online = devices.filter(d => {
+        const s = deviceOnlineStatus[d.device_id];
+        return s && s !== 'offline' && s !== 'Checking...';
+      }).length;
+      document.getElementById('totalDevices').textContent = total;
+      document.getElementById('onlineDevices').textContent = online;
+      document.getElementById('offlineDevices').textContent = total - online;
+    }
+
+    // ── Sort & Filter ──
+    function sortDevices(devicesToSort) {
+      let sorted = [...devicesToSort];
+      switch (currentSortBy) {
+        case 'name': sorted.sort((a,b) => a.device_id.localeCompare(b.device_id)); break;
+        case 'status':
+          const onD = sorted.filter(d => deviceOnlineStatus[d.device_id] !== 'offline' && deviceOnlineStatus[d.device_id] !== 'Checking...');
+          const offD = sorted.filter(d => deviceOnlineStatus[d.device_id] === 'offline' || deviceOnlineStatus[d.device_id] === 'Checking...');
+          sorted = [...onD, ...offD]; break;
+        case 'recent': sorted.reverse(); break;
+        case 'rank': default: sorted.sort((a,b) => a.device_rank - b.device_rank); break;
+      }
+      return sorted;
+    }
+
+    function filterDevices(devicesToFilter) {
+      let filtered = devicesToFilter;
+      if (searchQuery) filtered = filtered.filter(d => d.device_id.toLowerCase().includes(searchQuery));
+      if (currentFilter === 'online') filtered = filtered.filter(d => deviceOnlineStatus[d.device_id] !== 'offline' && deviceOnlineStatus[d.device_id] !== 'Checking...');
+      else if (currentFilter === 'offline') filtered = filtered.filter(d => deviceOnlineStatus[d.device_id] === 'offline' || deviceOnlineStatus[d.device_id] === 'Checking...');
+      return filtered;
+    }
+
+    // ── Render Devices ──
+    function renderDevices() {
+      if (renderTimeout) clearTimeout(renderTimeout);
+      renderTimeout = setTimeout(() => {
+        const grid = document.getElementById('deviceGrid');
+        const layout = localStorage.getItem('deviceLayout') || 'grid';
+        grid.className = `bento-grid layout-${layout}`;
+        updateStats();
+
+        if (devices.length === 0) {
+          grid.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 12h6M12 9v6"/>
+                </svg>
+              </div>
+              <div class="empty-title">No Devices Found</div>
+              <div class="empty-subtitle">Tap the + button to add your first smart device and start automating your home</div>
+            </div>`;
+          return;
+        }
+
+        let displayDevices = filterDevices(devices);
+        displayDevices = sortDevices(displayDevices);
+
+        if (displayDevices.length === 0) {
+          grid.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+              </div>
+              <div class="empty-title">No Matches Found</div>
+              <div class="empty-subtitle">Try adjusting your search or filter</div>
+            </div>`;
+          return;
+        }
+
+        grid.innerHTML = '';
+
+        displayDevices.forEach(device => {
+          const displayMessage = deviceOnlineStatus[device.device_id] || 'offline';
+          const isOnline = !(displayMessage === 'offline' || displayMessage === 'Checking...');
+          const isChecking = displayMessage === 'Checking...';
+
+          const card = document.createElement('div');
+          card.className = `glass-tile${isOnline ? ' online' : ''}`;
+          card.dataset.deviceId = device.device_id;
+
+          const quickControlEnabled = localStorage.getItem('quickControl') === 'true';
+
+          if (quickControlEnabled && isOnline) {
+            card.classList.add('swipeable');
+            if (deviceSwipeState[device.device_id]) card.classList.add('swiped');
+
+            const knownState = devicePowerStatus[device.device_id] || null;
+            const btnState  = knownState === 'ON' ? 'state-on' : knownState === 'OFF' ? 'state-off' : 'state-unknown';
+            const labelText = knownState === 'ON' ? 'ON' : knownState === 'OFF' ? 'OFF' : '—';
+            const trackClass = deviceSwipeState[device.device_id] ? 'card-track revealed' : 'card-track';
+
+            card.innerHTML = `
+              <div class="${trackClass}">
+                <div class="card-panel card-panel-info">
+                  <div class="tile-icon"><i class="fa-solid fa-plug-circle-bolt"></i></div>
+                  <div class="tile-name">${device.device_id}</div>
+                  <div class="tile-status online">
+                    <span class="tile-status-dot"></span>
+                    <span>${displayMessage}</span>
+                  </div>
+                  <div class="swipe-hint">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="card-panel card-panel-control" style="position:relative;">
+                  <div class="qc-back-hint">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </div>
+                  <button class="qc-power-btn ${btnState}" data-device-id="${device.device_id}" onclick="event.stopPropagation(); quickToggleDevice('${device.device_id}', this)">
+                    <svg class="qc-power-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>
+                    </svg>
+                  </button>
+                  <span class="qc-status-label ${btnState}">${labelText}</span>
+                </div>
+              </div>`;
+
+            attachSwipeListeners(card, device.device_id);
+          } else {
+            const statusClass = isChecking ? 'checking' : (isOnline ? 'online' : 'offline');
+            card.innerHTML = `
+              <div class="tile-icon"><i class="fa-solid fa-plug-circle-bolt"></i></div>
+              <div class="tile-name">${device.device_id}</div>
+              <div class="tile-status ${statusClass}">
+                <span class="tile-status-dot"></span>
+                <span>${displayMessage}</span>
+              </div>`;
+            addHapticToElement(card, () => openDeviceControl(device.device_id));
+          }
+
+          grid.appendChild(card);
+        });
+
+        updateStats();
+      }, 80);
+    }
+
+    function updateDeviceOnlineStatus(deviceId, message, isOnline) {
+      document.querySelectorAll(`.glass-tile[data-device-id="${deviceId}"]`).forEach(card => {
+        card.classList.toggle('online', isOnline);
+        const statusEl = card.querySelector('.tile-status');
+        if (statusEl) {
+          const textEl = statusEl.querySelector('span:last-child');
+          const isChecking = message === 'Checking...';
+          statusEl.className = `tile-status ${isChecking ? 'checking' : (isOnline ? 'online' : 'offline')}`;
+          if (textEl) textEl.textContent = message;
+        }
+        updateQcPanel(card, deviceId, isOnline);
+      });
+      debouncedUpdateStats();
+      if (currentSortBy === 'status') debouncedRenderDevices();
+    }
+
+    let _statsTimer = null;
+    function debouncedUpdateStats() { clearTimeout(_statsTimer); _statsTimer = setTimeout(updateStats, 150); }
+    let _renderTimer = null;
+    function debouncedRenderDevices() { clearTimeout(_renderTimer); _renderTimer = setTimeout(renderDevices, 300); }
+
+    function checkAllDevicesStatus() {
+      devices.forEach(d => {
+        deviceOnlineStatus[d.device_id] = 'Checking...';
+        updateDeviceOnlineStatus(d.device_id, 'Checking...', false);
+        const ofTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${d.device_id}/OF`;
+        clearTimeout(deviceTimeouts[d.device_id]);
+        mqttClient.publish(ofTopic, 'check_status');
+        deviceTimeouts[d.device_id] = setTimeout(() => {
+          if (deviceOnlineStatus[d.device_id] === 'Checking...') {
+            deviceOnlineStatus[d.device_id] = 'offline';
+            updateDeviceOnlineStatus(d.device_id, 'offline', false);
+          }
+        }, 5000);
+      });
+    }
+
+    // ── Device Actions ──
+    function openDeviceControl(deviceId) {
+      sessionStorage.setItem('active_device', deviceId);
+      const currentDeviceStatus = {
+        status: deviceOnlineStatus[deviceId] || 'unknown',
+        isOnline: deviceOnlineStatus[deviceId] !== 'offline' && deviceOnlineStatus[deviceId] !== 'Checking...' && deviceOnlineStatus[deviceId] !== 'unknown',
+        timestamp: Date.now()
+      };
+      sessionStorage.setItem('device_status_cache', JSON.stringify(currentDeviceStatus));
+      window.location.href = 'control.html';
+    }
+
+    function addDevice() {
+      hideActionSheet();
+      const deviceId = 'AADA-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+      sessionStorage.setItem('provisioning', JSON.stringify({
+        email: currentUser.email,
+        password: currentUser.password,
+        hashed_email: currentUser.hashed_email,
+        hashed_password: currentUser.hashed_password,
+        device_id: deviceId
+      }));
+      window.location.href = 'wifi_setup.html';
+    }
+
+    function refreshDevices() {
+      hideActionSheet();
+      if (!mqttClient || !mqttClient.connected) { alert('Not connected to server'); return; }
+      checkAllDevicesStatus();
+      const grid = document.getElementById('deviceGrid');
+      grid.style.opacity = '0.5';
+      setTimeout(() => grid.style.opacity = '1', 400);
+    }
+
+    function logout() {
+      hideActionSheet();
+      if (confirm('Are you sure you want to logout?')) {
+        localStorage.removeItem('remembered_user');
+        localStorage.removeItem('rememberMe');
+        sessionStorage.clear();
+        window.location.href = 'login.html';
+      }
+    }
+
+    function toggleRememberMe(enabled) {
+      localStorage.setItem('rememberMe', enabled ? 'true' : 'false');
+      if (enabled && currentUser) localStorage.setItem('remembered_user', JSON.stringify(currentUser));
+      else localStorage.removeItem('remembered_user');
+    }
+
+    // ── Quick Control (Swipe) ──
+    function toggleQuickControl(enabled) {
+      localStorage.setItem('quickControl', enabled ? 'true' : 'false');
+      if (enabled && mqttClient && mqttClient.connected) {
+        devices.forEach(device => {
+          const t = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${device.device_id}/status`;
+          mqttClient.subscribe(t);
+        });
+      }
+      deviceSwipeState = {};
+      renderDevices();
+    }
+
+    function attachSwipeListeners(card, deviceId) {
+      let startX = 0, startY = 0, startT = 0, dragging = false, didScroll = false;
+      card.addEventListener('touchstart', e => {
+        startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+        startT = Date.now(); dragging = true; didScroll = false;
+      }, { passive: true });
+      card.addEventListener('touchmove', e => {
+        if (!dragging) return;
+        const dx = e.touches[0].clientX - startX;
+        const dy = e.touches[0].clientY - startY;
+        const angle = Math.abs(Math.atan2(dy, dx) * 180 / Math.PI);
+        if (angle > 35 && angle < 145) didScroll = true;
+      }, { passive: true });
+      card.addEventListener('touchend', e => {
+        if (!dragging || didScroll) { dragging = false; return; }
+        dragging = false;
+        const dx = e.changedTouches[0].clientX - startX;
+        const dt = Date.now() - startT;
+        const isSwipe = Math.abs(dx) > 36 || (Math.abs(dx) > 18 && dt < 250);
+        if (!isSwipe) {
+          const track = card.querySelector('.card-track');
+          if (!track || !track.classList.contains('revealed')) openDeviceControl(deviceId);
+          return;
+        }
+        const track = card.querySelector('.card-track');
+        if (!track) return;
+        const isRevealed = track.classList.contains('revealed');
+        if (dx < 0 && !isRevealed) { track.classList.add('revealed'); card.classList.add('swiped'); deviceSwipeState[deviceId] = true; }
+        else if (dx > 0 && isRevealed) { track.classList.remove('revealed'); card.classList.remove('swiped'); deviceSwipeState[deviceId] = false; }
+        else if (dx > 0 && !isRevealed) { openDeviceControl(deviceId); }
+      }, { passive: true });
+    }
+
+    function updateQcPanel(card, deviceId, isOnline) {
+      const btn   = card.querySelector('.qc-power-btn');
+      const label = card.querySelector('.qc-status-label');
+      if (!btn || btn.classList.contains('state-pending')) return;
+      const knownState = devicePowerStatus[deviceId] || null;
+      btn.className = 'qc-power-btn';
+      if (label) label.className = 'qc-status-label';
+      if (!isOnline) {
+        btn.classList.add('state-unknown'); btn.disabled = true;
+        if (label) { label.classList.add('state-unknown'); label.textContent = 'Offline'; }
+      } else if (knownState === 'ON') {
+        btn.classList.add('state-on'); btn.disabled = false;
+        if (label) { label.classList.add('state-on'); label.textContent = 'ON'; }
+      } else if (knownState === 'OFF') {
+        btn.classList.add('state-off'); btn.disabled = false;
+        if (label) { label.classList.add('state-off'); label.textContent = 'OFF'; }
+      } else {
+        btn.classList.add('state-unknown'); btn.disabled = false;
+        if (label) { label.classList.add('state-unknown'); label.textContent = '—'; }
+      }
+    }
+
+    function quickToggleDevice(deviceId, btn) {
+      if (!mqttClient || !mqttClient.connected) { alert('Not connected to server'); return; }
+      if (btn.classList.contains('state-pending')) return;
+      const isOnline = deviceOnlineStatus[deviceId] !== 'offline' && deviceOnlineStatus[deviceId] !== 'Checking...' && deviceOnlineStatus[deviceId] !== 'unknown';
+      if (!isOnline) return;
+      const command = devicePowerStatus[deviceId] === 'ON' ? '0' : '1';
+      const controlTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${deviceId}/control`;
+      const label = btn.closest('.card-panel-control') && btn.closest('.card-panel-control').querySelector('.qc-status-label');
+      btn.className = 'qc-power-btn state-pending';
+      if (label) { label.className = 'qc-status-label state-pending'; label.textContent = '…'; }
+      if (shouldHapticAll() || shouldHapticController()) hapticFeedback(getHapticIntensity());
+      mqttClient.publish(controlTopic, command);
+      setTimeout(() => {
+        if (btn.classList.contains('state-pending')) {
+          const c = btn.closest('.glass-tile');
+          if (c) updateQcPanel(c, deviceId, isOnline);
+        }
+      }, 5000);
+    }
+
+    // ── Tooltip Hold System ──
+    (function() {
+      function makeHoldTooltip(btnId, tooltipId) {
+        let holdTimer = null;
+        document.addEventListener('DOMContentLoaded', function() {
+          const btn = document.getElementById(btnId);
+          const tip = document.getElementById(tooltipId);
+          if (!btn || !tip) return;
+          btn.addEventListener('mousedown', e => { e.stopPropagation(); holdTimer = setTimeout(() => tip.style.display = 'block', 300); });
+          btn.addEventListener('touchstart', e => { e.stopPropagation(); holdTimer = setTimeout(() => tip.style.display = 'block', 300); }, {passive:true});
+          btn.addEventListener('mouseup', () => { clearTimeout(holdTimer); tip.style.display = 'none'; });
+          btn.addEventListener('mouseleave', () => { clearTimeout(holdTimer); tip.style.display = 'none'; });
+          btn.addEventListener('touchend', () => { clearTimeout(holdTimer); tip.style.display = 'none'; });
+          btn.addEventListener('touchcancel', () => { clearTimeout(holdTimer); tip.style.display = 'none'; });
+          btn.addEventListener('click', e => e.stopPropagation());
+        });
+      }
+      makeHoldTooltip('qcInfoBtn', 'qcTooltip');
+      makeHoldTooltip('rmInfoBtn', 'rmTooltip');
+    })();
+
+    // ── Boot ──
+    setInterval(updateLiquidTheme, 60000);
+    window.onload = init;
+    window.addEventListener('pageshow', e => { if (e.persisted) init(); });
+  </script>
+</body>
+</html>
