@@ -1,0 +1,2084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#090909">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AADAconnect</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    /* ── Design Tokens ── */
+    :root {
+      --bg:            #090909;
+      --surface-0:     #101010;
+      --surface-1:     #161616;
+      --surface-2:     #1c1c1c;
+      --surface-3:     #232323;
+      --border:        rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.14);
+      --text-1:        #f5f5f5;
+      --text-2:        rgba(245,245,245,0.55);
+      --text-3:        rgba(245,245,245,0.28);
+      --accent:        #e8ff5a;       /* electric lime — the ONE pop of color */
+      --accent-dim:    rgba(232,255,90,0.12);
+      --accent-border: rgba(232,255,90,0.3);
+      --online:        #4ade80;
+      --online-dim:    rgba(74,222,128,0.12);
+      --offline:       rgba(245,245,245,0.2);
+      --danger:        #ff5a5a;
+      --danger-dim:    rgba(255,90,90,0.12);
+      --r-xs: 8px;
+      --r-sm: 12px;
+      --r-md: 16px;
+      --r-lg: 20px;
+      --r-xl: 24px;
+      --r-2xl: 32px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
+    }
+
+    body.light {
+      --bg:            #f2f2f0;
+      --surface-0:     #f9f9f7;
+      --surface-1:     #ffffff;
+      --surface-2:     #f4f4f2;
+      --surface-3:     #ebebea;
+      --border:        rgba(0,0,0,0.07);
+      --border-strong: rgba(0,0,0,0.13);
+      --text-1:        #111111;
+      --text-2:        rgba(17,17,17,0.5);
+      --text-3:        rgba(17,17,17,0.28);
+      --accent:        #5a6e00;
+      --accent-dim:    rgba(90,110,0,0.1);
+      --accent-border: rgba(90,110,0,0.25);
+    }
+
+    *, *::before, *::after {
+      margin: 0; padding: 0;
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Subtle noise texture overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.025;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── App Shell ── */
+    .app {
+      width: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      min-height: 100vh;
+      padding: 0 0 120px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Top Bar ── */
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 20px 0;
+      height: 72px;
+    }
+
+    .brand {
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      color: var(--text-1);
+    }
+    .brand span {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-left: 2px;
+      vertical-align: middle;
+      margin-bottom: 2px;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 38px; height: 38px;
+      border-radius: var(--r-sm);
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.15s;
+      color: var(--text-2);
+      font-size: 0.85rem;
+    }
+    .icon-btn:active { transform: scale(0.92); background: var(--surface-2); }
+
+    .mqtt-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 12px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xs);
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--text-3);
+      letter-spacing: 0.2px;
+    }
+    .mqtt-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--offline);
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    .mqtt-dot.connected {
+      background: var(--online);
+      box-shadow: 0 0 6px var(--online);
+    }
+
+    /* ── Hero Block ── */
+    .hero {
+      padding: 28px 20px 20px;
+    }
+
+    .hero-greeting {
+      font-size: 2rem;
+      font-weight: 300;
+      letter-spacing: -0.8px;
+      line-height: 1.15;
+      color: var(--text-1);
+      margin-bottom: 8px;
+    }
+    .hero-greeting strong {
+      font-weight: 700;
+    }
+
+    .hero-desc {
+      font-size: 0.85rem;
+      color: var(--text-2);
+      font-style: italic;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    /* ── Search ── */
+    .search-wrap {
+      padding: 0 20px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .search-wrap.visible { display: block; }
+
+    .search-inner {
+      position: relative;
+    }
+    .search-input {
+      width: 100%;
+      padding: 12px 40px 12px 40px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text-1);
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--accent-border);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+    .search-input::placeholder { color: var(--text-3); }
+    .search-ico {
+      position: absolute; left: 13px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-3); font-size: 0.8rem;
+    }
+    .search-clear {
+      position: absolute; right: 10px; top: 50%;
+      transform: translateY(-50%);
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      border: none;
+      display: none; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--text-2); font-size: 0.7rem;
+    }
+    .search-clear.show { display: flex; }
+
+    /* ── Filter Chips ── */
+    .chips {
+      padding: 0 20px;
+      margin-bottom: 20px;
+    }
+
+    .chip-capsule {
+      display: inline-flex;
+      align-items: center;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 3px;
+      gap: 0;
+    }
+
+    .chip-sep {
+      color: var(--border-strong);
+      font-size: 0.75rem;
+      user-select: none;
+      padding: 0 2px;
+    }
+
+    .chip {
+      padding: 6px 14px;
+      border-radius: 100px;
+      background: transparent;
+      border: none;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-2);
+      cursor: pointer;
+      white-space: nowrap;
+      display: flex; align-items: center; gap: 6px;
+      transition: all 0.15s;
+    }
+    .chip:active { transform: scale(0.95); }
+    .chip.active {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent-border);
+      color: var(--accent);
+    }
+    body.light .chip.active { color: var(--accent); }
+    .chip-count {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: inherit;
+      opacity: 0.7;
+    }
+
+    /* ── Section Row ── */
+    .section-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 20px;
+      margin-bottom: 14px;
+    }
+    .section-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-3);
+    }
+    .sort-pill {
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 12px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 0.7rem; font-weight: 600;
+      color: var(--text-2);
+      cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .sort-pill:active { transform: scale(0.95); }
+
+    /* ── Device Grid ── */
+    .device-grid {
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* ── Device Card ── */
+    .device-card {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 18px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      min-height: 136px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: border-color 0.2s, background 0.2s, transform 0.2s;
+      will-change: transform;
+    }
+    .device-card:active { transform: scale(0.97); }
+    .device-card.online {
+      border-color: rgba(74,222,128,0.2);
+      background: var(--surface-1);
+    }
+    .device-card.online::before {
+      content: '';
+      position: absolute;
+      top: 0; right: 0;
+      width: 60px; height: 60px;
+      background: radial-gradient(circle at top right, rgba(74,222,128,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .device-icon {
+      width: 40px; height: 40px;
+      border-radius: var(--r-sm);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+      color: var(--text-3);
+      transition: all 0.2s;
+    }
+    .device-card.online .device-icon {
+      background: rgba(74,222,128,0.1);
+      border-color: rgba(74,222,128,0.2);
+      color: var(--online);
+    }
+
+    .card-status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--offline);
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+    .device-card.online .card-status-dot {
+      background: var(--online);
+      box-shadow: 0 0 6px var(--online);
+    }
+    .device-card.checking .card-status-dot {
+      background: var(--text-3);
+      animation: blink 1.5s ease infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .card-bottom { }
+    .device-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-1);
+      margin-bottom: 3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .device-status-text {
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: var(--text-3);
+      font-family: 'DM Mono', monospace;
+    }
+    .device-card.online .device-status-text { color: var(--online); }
+    .device-card.checking .device-status-text { color: var(--text-3); }
+
+    /* ── Swipe / Quick Control ── */
+    .device-card.swipeable { padding: 0; cursor: default; }
+    .device-card.swipeable:active { transform: none; }
+
+    .card-track {
+      display: flex;
+      width: 200%;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+      height: 100%;
+    }
+    .card-track.revealed { transform: translateX(-50%); }
+
+    .card-panel {
+      width: 50%;
+      flex-shrink: 0;
+    }
+    .card-panel-info {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 136px;
+      position: relative;
+    }
+    .card-panel-control {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: var(--surface-2);
+      min-height: 136px;
+    }
+
+    /* swipe hint arrow */
+    .swipe-hint {
+      position: absolute; right: 10px; top: 50%;
+      transform: translateY(-50%);
+      opacity: 0;
+      pointer-events: none;
+      animation: hintFade 0.5s ease 1.2s forwards, hintPulse 2s ease-in-out 1.7s infinite;
+      color: var(--text-3); font-size: 0.6rem;
+    }
+    @keyframes hintFade  { to { opacity: 1 } }
+    @keyframes hintPulse { 0%,100%{transform:translateY(-50%) translateX(0)} 50%{transform:translateY(-50%) translateX(-3px)} }
+    .card-track.revealed .swipe-hint { display: none; }
+
+    .qc-back-hint {
+      position: absolute; left: 8px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-3); font-size: 0.6rem;
+      opacity: 0.4; pointer-events: none;
+    }
+
+    /* Power button */
+    .qc-power-btn {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s, box-shadow 0.2s;
+      font-size: 1rem;
+    }
+    .qc-power-btn:active { transform: scale(0.9); }
+    .qc-power-btn.state-on {
+      background: rgba(74,222,128,0.15);
+      border: 1.5px solid rgba(74,222,128,0.35);
+      color: var(--online);
+      box-shadow: 0 0 20px rgba(74,222,128,0.2);
+    }
+    .qc-power-btn.state-off {
+      background: var(--surface-3);
+      border: 1.5px solid var(--border);
+      color: var(--text-3);
+    }
+    .qc-power-btn.state-unknown {
+      background: var(--surface-3);
+      border: 1.5px solid var(--border);
+      color: var(--text-3);
+      opacity: 0.5;
+    }
+    .qc-power-btn.state-pending {
+      background: var(--accent-dim);
+      border: 1.5px solid var(--accent-border);
+      color: var(--accent);
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg) } }
+
+    .qc-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-family: 'DM Mono', monospace;
+    }
+    .qc-label.state-on  { color: var(--online); }
+    .qc-label.state-off { color: var(--text-3); }
+    .qc-label.state-unknown { color: var(--text-3); }
+    .qc-label.state-pending { color: var(--accent); }
+
+    /* ── Layout Variants ── */
+    .device-grid.layout-list {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .device-grid.layout-list .device-card {
+      flex-direction: row;
+      align-items: center;
+      min-height: unset;
+      padding: 14px 18px;
+      border-radius: var(--r-lg);
+      gap: 14px;
+    }
+    .device-grid.layout-list .card-top { flex-direction: row; align-items: center; gap: 14px; flex: 1; }
+    .device-grid.layout-list .card-bottom { margin-left: auto; }
+    .device-grid.layout-list .device-icon { margin: 0; flex-shrink: 0; }
+    .device-grid.layout-list .card-status-dot { display: none; }
+    .device-grid.layout-list .device-card.online::before { width: 100px; height: 100%; border-radius: var(--r-lg); }
+
+    .device-grid.layout-bento {
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .device-grid.layout-bento .device-card:first-child {
+      grid-column: span 2;
+      flex-direction: row;
+      align-items: center;
+      min-height: 88px;
+      gap: 18px;
+    }
+    .device-grid.layout-bento .device-card:first-child .card-bottom { flex: 1; }
+
+    .device-grid.layout-compact {
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+    .device-grid.layout-compact .device-card {
+      min-height: 108px;
+      padding: 14px;
+      border-radius: var(--r-lg);
+    }
+    .device-grid.layout-compact .device-icon { width: 34px; height: 34px; font-size: 0.85rem; }
+    .device-grid.layout-compact .device-name { font-size: 0.72rem; }
+    .device-grid.layout-compact .device-status-text { font-size: 0.6rem; }
+
+    /* ── Empty / Loading ── */
+    .state-block {
+      grid-column: span 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      gap: 14px;
+      text-align: center;
+    }
+    .state-icon {
+      width: 52px; height: 52px;
+      border-radius: var(--r-lg);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-3);
+      font-size: 1.1rem;
+    }
+    .state-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-2);
+    }
+    .state-sub {
+      font-size: 0.8rem;
+      color: var(--text-3);
+      line-height: 1.5;
+      max-width: 220px;
+    }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* ── Nav Dock ── */
+    .dock-wrap {
+      position: fixed;
+      bottom: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      padding: 12px 20px 28px;
+      background: linear-gradient(to top, var(--bg) 60%, transparent);
+      z-index: 100;
+      pointer-events: none;
+    }
+    .dock {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface-1);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-2xl);
+      padding: 10px 16px;
+      pointer-events: all;
+      box-shadow: var(--shadow-lg);
+    }
+    .dock-item {
+      width: 42px; height: 42px;
+      border-radius: var(--r-md);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      color: var(--text-3);
+      font-size: 0.9rem;
+      transition: all 0.15s;
+      position: relative;
+    }
+    .dock-item:active { transform: scale(0.88); }
+    .dock-item.active {
+      color: var(--text-1);
+    }
+    .dock-item.active::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 50%; transform: translateX(-50%);
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .dock-fab {
+      width: 44px; height: 44px;
+      border-radius: var(--r-md);
+      background: var(--accent);
+      color: #090909;
+      font-size: 1rem;
+      border: none;
+    }
+    .dock-fab:active { transform: scale(0.88); }
+
+    /* ── Overlay ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .overlay.show { opacity: 1; pointer-events: all; }
+
+    /* ── Bottom Sheet (shared base) ── */
+    .sheet {
+      position: fixed;
+      bottom: 0; left: 50%;
+      transform: translateX(-50%) translateY(105%);
+      width: 100%;
+      max-width: 430px;
+      background: var(--surface-0);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 24px 24px 0 0;
+      padding: 0 0 40px;
+      z-index: 300;
+      transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+      max-height: 85vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .sheet.show { transform: translateX(-50%) translateY(0); }
+
+    .sheet-handle-area {
+      padding: 14px 20px 0;
+      flex-shrink: 0;
+    }
+    .sheet-handle {
+      width: 36px; height: 4px;
+      background: var(--surface-3);
+      border-radius: 2px;
+      margin: 0 auto 18px;
+    }
+    .sheet-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 20px;
+    }
+    .sheet-back {
+      width: 32px; height: 32px;
+      border-radius: var(--r-xs);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--text-2); font-size: 0.75rem;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .sheet-back:active { transform: scale(0.9); }
+    .sheet-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-1);
+      letter-spacing: -0.2px;
+    }
+
+    .sheet-scroll {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 20px;
+      flex: 1;
+    }
+    .sheet-scroll::-webkit-scrollbar { display: none; }
+
+    /* Category label in sheets */
+    .sheet-cat {
+      font-size: 0.63rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-3);
+      margin: 20px 0 8px;
+      padding: 0 2px;
+    }
+    .sheet-cat:first-child { margin-top: 0; }
+
+    /* Sheet row item */
+    .sheet-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 13px 14px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sheet-item:last-child { margin-bottom: 0; }
+    .sheet-item:active { transform: scale(0.98); background: var(--surface-2); }
+    .sheet-item.no-pointer { cursor: default; }
+    .sheet-item.no-pointer:active { transform: none; background: var(--surface-1); }
+
+    .item-icon {
+      width: 38px; height: 38px;
+      border-radius: var(--r-sm);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-2);
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    .item-icon.accent {
+      background: var(--accent-dim);
+      border-color: var(--accent-border);
+      color: var(--accent);
+    }
+    .item-icon.danger {
+      background: var(--danger-dim);
+      border-color: rgba(255,90,90,0.2);
+      color: var(--danger);
+    }
+
+    .item-body { flex: 1; min-width: 0; }
+    .item-title {
+      font-size: 0.86rem; font-weight: 600;
+      color: var(--text-1); margin-bottom: 2px;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .item-title.danger { color: var(--danger); }
+    .item-sub { font-size: 0.73rem; color: var(--text-2); }
+
+    .item-chevron { color: var(--text-3); font-size: 0.7rem; flex-shrink: 0; }
+
+    /* Toggle */
+    .toggle { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: var(--surface-3);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+      border: 1px solid var(--border);
+    }
+    .toggle-thumb {
+      position: absolute;
+      height: 18px; width: 18px;
+      left: 2px; top: 2px;
+      background: var(--text-2);
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: var(--accent-dim); border-color: var(--accent-border); }
+    .toggle input:checked + .toggle-track .toggle-thumb {
+      transform: translateX(18px);
+      background: var(--accent);
+    }
+
+    /* Sort option */
+    .sort-opt {
+      display: flex; align-items: center;
+      padding: 13px 14px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sort-opt:active { transform: scale(0.98); }
+    .sort-opt.active {
+      background: var(--accent-dim);
+      border-color: var(--accent-border);
+    }
+    .sort-opt-body { flex: 1; }
+    .sort-opt-title { font-size: 0.86rem; font-weight: 600; color: var(--text-1); margin-bottom: 2px; }
+    .sort-opt.active .sort-opt-title { color: var(--accent); }
+    .sort-opt-sub { font-size: 0.72rem; color: var(--text-2); }
+    .sort-opt.active .sort-opt-sub { color: rgba(232,255,90,0.6); }
+    body.light .sort-opt.active .sort-opt-sub { color: rgba(90,110,0,0.6); }
+    .sort-check {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border-strong);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.55rem; color: transparent;
+      transition: all 0.15s;
+    }
+    .sort-opt.active .sort-check {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #090909;
+    }
+
+    /* Layout option */
+    .layout-opt {
+      display: flex; align-items: center; gap: 14px;
+      padding: 13px 14px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      margin-bottom: 8px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .layout-opt:active { transform: scale(0.98); }
+    .layout-opt.active { background: var(--accent-dim); border-color: var(--accent-border); }
+    .layout-opt-icon {
+      width: 38px; height: 38px;
+      border-radius: var(--r-sm);
+      background: var(--surface-2); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-2); font-size: 0.85rem;
+    }
+    .layout-opt.active .layout-opt-icon { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent); }
+    .layout-opt-body { flex: 1; }
+    .layout-opt-title { font-size: 0.86rem; font-weight: 600; color: var(--text-1); margin-bottom: 2px; }
+    .layout-opt.active .layout-opt-title { color: var(--accent); }
+    .layout-opt-sub { font-size: 0.72rem; color: var(--text-2); }
+
+    /* Haptics */
+    .haptic-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 14px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      margin-bottom: 8px;
+    }
+    .haptic-row label {
+      display: flex; align-items: center; gap: 12px;
+      cursor: pointer; flex: 1;
+    }
+    .haptic-row input[type="checkbox"] {
+      width: 18px; height: 18px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .haptic-row span { font-size: 0.85rem; font-weight: 500; color: var(--text-1); }
+
+    .intensity-wrap {
+      padding: 14px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      margin-bottom: 8px;
+    }
+    .intensity-title { font-size: 0.82rem; font-weight: 600; color: var(--text-1); margin-bottom: 12px; }
+    .slider-row { display: flex; align-items: center; gap: 12px; }
+    .slider {
+      flex: 1; height: 4px;
+      -webkit-appearance: none;
+      background: var(--surface-3);
+      border-radius: 2px; outline: none; cursor: pointer;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 3px solid var(--bg);
+      box-shadow: 0 0 8px rgba(232,255,90,0.4);
+    }
+    .slider::-moz-range-thumb {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 3px solid var(--bg);
+    }
+    .slider-val { font-size: 0.75rem; font-family: 'DM Mono', monospace; color: var(--text-2); min-width: 38px; font-weight: 500; }
+
+    /* Personalize */
+    .p-label {
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 2px; color: var(--text-3);
+      margin: 20px 0 10px; padding: 0 2px;
+    }
+    .p-label:first-child { margin-top: 0; }
+    .p-input-row { display: flex; gap: 8px; align-items: center; }
+    .p-input {
+      flex: 1; padding: 12px 14px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text-1); font-size: 0.88rem; font-family: inherit; outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .p-input:focus { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-dim); }
+    .p-input::placeholder { color: var(--text-3); }
+    .p-save-btn {
+      padding: 12px 18px;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent-border);
+      border-radius: var(--r-md);
+      color: var(--accent);
+      font-size: 0.8rem; font-weight: 700; font-family: inherit;
+      cursor: pointer; white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .p-save-btn:active { transform: scale(0.95); }
+    .p-save-btn.saved { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.3); color: var(--online); }
+
+    /* Theme swatches */
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .swatch {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      cursor: pointer; transition: transform 0.15s;
+    }
+    .swatch:active { transform: scale(0.94); }
+    .swatch-preview {
+      width: 100%; aspect-ratio: 1.6;
+      border-radius: var(--r-md);
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .swatch.active .swatch-preview { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+    .swatch span { font-size: 0.63rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-3); }
+    .swatch.active span { color: var(--accent); }
+
+    .color-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px;
+      background: var(--surface-1); border: 1px solid var(--border);
+      border-radius: var(--r-md); margin-bottom: 8px;
+    }
+    .color-row-label { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: var(--text-1); }
+    .color-swatch-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border); }
+    .color-input {
+      -webkit-appearance: none; width: 36px; height: 24px;
+      border: none; border-radius: var(--r-xs); cursor: pointer;
+      background: transparent; padding: 0;
+    }
+    .color-input::-webkit-color-swatch-wrapper { padding: 0; border-radius: var(--r-xs); }
+    .color-input::-webkit-color-swatch { border: 1px solid var(--border); border-radius: var(--r-xs); }
+
+    /* Tooltips */
+    #qcTooltip, #rmTooltip {
+      display: none;
+      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+      background: var(--surface-0);
+      color: var(--text-1); font-size: 0.78rem; font-weight: 500; line-height: 1.5;
+      padding: 10px 14px; border-radius: var(--r-md);
+      border: 1px solid var(--border-strong);
+      box-shadow: var(--shadow-md);
+      max-width: 280px; width: max-content; text-align: center;
+      z-index: 9999; pointer-events: none;
+    }
+
+    /* Tap animation */
+    .tap-pop { animation: tapPop 0.3s ease; }
+    @keyframes tapPop { 0%{transform:scale(1)} 40%{transform:scale(0.95)} 100%{transform:scale(1)} }
+
+    /* ── Info badge (i) ── */
+    .info-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 15px; height: 15px; border-radius: 50%;
+      background: var(--surface-3);
+      color: var(--text-3);
+      font-size: 9px; font-weight: 700; font-style: italic; font-family: Georgia, serif;
+      cursor: pointer; user-select: none; flex-shrink: 0;
+    }
+
+    @media (max-width: 375px) {
+      .device-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="brand">AADAconnect<span></span></div>
+    <div class="topbar-right">
+      <div class="mqtt-badge">
+        <div class="mqtt-dot" id="mqttDot"></div>
+        <span id="userEmailHero">–</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1 class="hero-greeting" id="greeting">Hello<br><strong>there</strong></h1>
+    <p class="hero-desc" id="status-desc">Connecting to your environment…</p>
+
+  </section>
+
+  <!-- Search -->
+  <div class="search-wrap" id="searchWrap">
+    <div class="search-inner">
+      <i class="fa-solid fa-magnifying-glass search-ico"></i>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search devices…">
+      <button class="search-clear" id="clearSearch"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+  </div>
+
+  <!-- Chips -->
+  <div class="chips">
+    <div class="chip-capsule">
+      <div class="chip active" data-filter="all">All <span class="chip-count" id="chipTotal">0</span></div>
+      <span class="chip-sep">|</span>
+      <div class="chip" data-filter="online"><span style="width:5px;height:5px;border-radius:50%;background:var(--online);display:inline-block;"></span> Online <span class="chip-count" id="chipOnline">0</span></div>
+      <span class="chip-sep">|</span>
+      <div class="chip" data-filter="offline">Offline <span class="chip-count" id="chipOffline">0</span></div>
+    </div>
+  </div>
+
+  <!-- Section Header -->
+  <div class="section-row">
+    <div class="section-label">My Devices</div>
+    <button class="sort-pill" id="sortBtn">
+      <i class="fa-solid fa-arrow-up-wide-short" style="font-size:0.65rem;"></i>
+      <span id="sortLabel">Rank</span>
+    </button>
+  </div>
+
+  <!-- Device Grid -->
+  <div class="device-grid layout-grid" id="deviceGrid">
+    <div class="state-block">
+      <div class="spinner"></div>
+      <div class="state-title">Connecting…</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Nav Dock -->
+<div class="dock-wrap">
+  <nav class="dock">
+    <div class="dock-item active"><i class="fa-solid fa-house-chimney-window"></i></div>
+    <div class="dock-item" id="searchDockBtn"><i class="fa-solid fa-magnifying-glass"></i></div>
+    <div class="dock-item dock-fab" id="addDeviceBtn"><i class="fa-solid fa-plus"></i></div>
+    <div class="dock-item" id="personalizeDockBtn"><i class="fa-solid fa-palette"></i></div>
+    <div class="dock-item" id="moreOptionsDockBtn"><i class="fa-solid fa-ellipsis-vertical"></i></div>
+  </nav>
+</div>
+
+<!-- Overlay -->
+<div class="overlay" id="overlay"></div>
+
+<!-- Settings Sheet -->
+<div class="sheet" id="settingsSheet">
+  <div class="sheet-handle-area">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" style="padding:0 2px 18px;">Settings</div>
+  </div>
+  <div class="sheet-scroll">
+
+    <div class="sheet-cat">Control</div>
+
+    <div class="sheet-item" id="refreshItem">
+      <div class="item-icon"><i class="fa-solid fa-rotate-right"></i></div>
+      <div class="item-body">
+        <div class="item-title">Refresh Devices</div>
+        <div class="item-sub">Ping all devices for latest status</div>
+      </div>
+    </div>
+
+    <div class="sheet-item no-pointer" id="quickControlItem">
+      <div class="item-icon"><i class="fa-solid fa-bolt"></i></div>
+      <div class="item-body">
+        <div class="item-title">
+          Quick Control
+          <span class="info-badge" id="qcInfoBtn">i</span>
+        </div>
+        <div class="item-sub">Swipe cards to toggle power</div>
+      </div>
+      <label class="toggle" onclick="event.stopPropagation()">
+        <input type="checkbox" id="quickControlToggle" onchange="toggleQuickControl(this.checked)">
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      </label>
+    </div>
+    <div id="qcTooltip">💡 Swipe a device card <strong>left</strong> to reveal quick power controls</div>
+
+    <div class="sheet-cat">Appearance</div>
+
+    <div class="sheet-item" id="themeToggleItem">
+      <div class="item-icon" id="themeToggleIcon"><i class="fa-solid fa-circle-half-stroke"></i></div>
+      <div class="item-body">
+        <div class="item-title">Light Mode</div>
+        <div class="item-sub">Switch between dark and light</div>
+      </div>
+    </div>
+
+    <div class="sheet-item" id="layoutItem">
+      <div class="item-icon"><i class="fa-solid fa-table-cells-large"></i></div>
+      <div class="item-body">
+        <div class="item-title">Device Layout</div>
+        <div class="item-sub" id="layoutSubtitle">Grid — 2-column tiles</div>
+      </div>
+      <i class="fa-solid fa-chevron-right item-chevron"></i>
+    </div>
+
+    <div class="sheet-item" id="hapticsItem">
+      <div class="item-icon"><i class="fa-solid fa-hand-pointer"></i></div>
+      <div class="item-body">
+        <div class="item-title">Haptic Feedback</div>
+        <div class="item-sub">Configure vibration settings</div>
+      </div>
+      <i class="fa-solid fa-chevron-right item-chevron"></i>
+    </div>
+
+    <div class="sheet-cat">Account</div>
+
+    <div class="sheet-item no-pointer" id="rememberMeItem">
+      <div class="item-icon"><i class="fa-solid fa-user-shield"></i></div>
+      <div class="item-body">
+        <div class="item-title">
+          Remember Me
+          <span class="info-badge" id="rmInfoBtn">i</span>
+        </div>
+        <div class="item-sub">Stay logged in automatically</div>
+      </div>
+      <label class="toggle" onclick="event.stopPropagation()">
+        <input type="checkbox" id="rememberMeToggle" onchange="toggleRememberMe(this.checked)">
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      </label>
+    </div>
+    <div id="rmTooltip">🔐 Skip the login screen and jump straight in next time</div>
+
+    <div class="sheet-item" id="logoutItem" style="margin-top:8px;">
+      <div class="item-icon danger"><i class="fa-solid fa-right-from-bracket"></i></div>
+      <div class="item-body">
+        <div class="item-title danger">Logout</div>
+        <div class="item-sub">Sign out of your account</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Haptics Sheet -->
+<div class="sheet" id="hapticsSheet">
+  <div class="sheet-handle-area">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back" id="hapticsBack"><i class="fa-solid fa-chevron-left"></i></div>
+      <div class="sheet-title">Haptic Feedback</div>
+    </div>
+  </div>
+  <div class="sheet-scroll">
+    <div class="haptic-row">
+      <label><input type="checkbox" id="hapticsController"><span>Controller on/off button</span></label>
+    </div>
+    <div class="haptic-row">
+      <label><input type="checkbox" id="hapticsAll"><span>All buttons</span></label>
+    </div>
+    <div class="intensity-wrap">
+      <div class="intensity-title">Intensity</div>
+      <div class="slider-row">
+        <input type="range" id="hapticsIntensity" min="10" max="200" step="10" value="50" class="slider">
+        <span class="slider-val" id="intensityValue">50ms</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sort Sheet -->
+<div class="sheet" id="sortSheet">
+  <div class="sheet-handle-area">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back" id="sortBack"><i class="fa-solid fa-chevron-left"></i></div>
+      <div class="sheet-title">Sort Devices</div>
+    </div>
+  </div>
+  <div class="sheet-scroll">
+    <div class="sort-opt active" data-sort="rank">
+      <div class="sort-opt-body"><div class="sort-opt-title">By Rank</div><div class="sort-opt-sub">Ordered by device rank number</div></div>
+      <div class="sort-check"><i class="fa-solid fa-check"></i></div>
+    </div>
+    <div class="sort-opt" data-sort="name">
+      <div class="sort-opt-body"><div class="sort-opt-title">By Name</div><div class="sort-opt-sub">Alphabetical order</div></div>
+      <div class="sort-check"><i class="fa-solid fa-check"></i></div>
+    </div>
+    <div class="sort-opt" data-sort="status">
+      <div class="sort-opt-body"><div class="sort-opt-title">By Status</div><div class="sort-opt-sub">Online devices first</div></div>
+      <div class="sort-check"><i class="fa-solid fa-check"></i></div>
+    </div>
+    <div class="sort-opt" data-sort="recent">
+      <div class="sort-opt-body"><div class="sort-opt-title">Recently Added</div><div class="sort-opt-sub">Newest devices first</div></div>
+      <div class="sort-check"><i class="fa-solid fa-check"></i></div>
+    </div>
+  </div>
+</div>
+
+<!-- Layout Sheet -->
+<div class="sheet" id="layoutSheet">
+  <div class="sheet-handle-area">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back" id="layoutBack"><i class="fa-solid fa-chevron-left"></i></div>
+      <div class="sheet-title">Device Layout</div>
+    </div>
+  </div>
+  <div class="sheet-scroll">
+    <div class="layout-opt" data-layout="grid">
+      <div class="layout-opt-icon"><i class="fa-solid fa-table-cells-large"></i></div>
+      <div class="layout-opt-body"><div class="layout-opt-title">Grid</div><div class="layout-opt-sub">2-column equal tiles</div></div>
+      <div class="sort-check"><i class="fa-solid fa-check"></i></div>
+    </div>
+    <div class="layout-opt" data-layout="list">
+      <div class="layout-opt-icon"><i class="fa-solid fa-list"></i></div>
+      <div class="layout-opt-body"><div class="layout-opt-title">List</div><div class="layout-opt-sub">Full-width rows</div></div>
+      <div class="sort-check"><i class="fa-solid fa-check"></i></div>
+    </div>
+    <div class="layout-opt" data-layout="bento">
+      <div class="layout-opt-icon"><i class="fa-solid fa-border-all"></i></div>
+      <div class="layout-opt-body"><div class="layout-opt-title">Bento</div><div class="layout-opt-sub">First card spans full width</div></div>
+      <div class="sort-check"><i class="fa-solid fa-check"></i></div>
+    </div>
+    <div class="layout-opt" data-layout="compact">
+      <div class="layout-opt-icon"><i class="fa-solid fa-grip"></i></div>
+      <div class="layout-opt-body"><div class="layout-opt-title">Compact</div><div class="layout-opt-sub">3-column dense grid</div></div>
+      <div class="sort-check"><i class="fa-solid fa-check"></i></div>
+    </div>
+  </div>
+</div>
+
+<!-- Personalize Sheet -->
+<div class="sheet" id="personalizeSheet" style="max-height:85vh;">
+  <div class="sheet-handle-area">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back" id="personalizeBack"><i class="fa-solid fa-chevron-left"></i></div>
+      <div class="sheet-title">Personalize</div>
+    </div>
+  </div>
+  <div class="sheet-scroll">
+    <div class="p-label">Display Name</div>
+    <div class="p-input-row">
+      <input type="text" id="displayNameInput" class="p-input" placeholder="Enter your name…" maxlength="24">
+      <button class="p-save-btn" id="saveDisplayName">Save</button>
+    </div>
+
+    <div class="p-label" style="margin-top:24px;">Background Theme</div>
+    <div class="swatches" id="themeSwatches">
+      <div class="swatch active" data-preset="dynamic">
+        <div class="swatch-preview" style="background:linear-gradient(135deg,#232323 0%, #2c2c2c 100%); border: 1px solid rgba(255,255,255,0.08);"></div>
+        <span>Dynamic</span>
+      </div>
+      <div class="swatch" data-preset="ocean">
+        <div class="swatch-preview" style="background:linear-gradient(135deg,#0a2540,#0e4d40);"></div>
+        <span>Ocean</span>
+      </div>
+      <div class="swatch" data-preset="sunset">
+        <div class="swatch-preview" style="background:linear-gradient(135deg,#3d1200,#2d0030);"></div>
+        <span>Sunset</span>
+      </div>
+      <div class="swatch" data-preset="forest">
+        <div class="swatch-preview" style="background:linear-gradient(135deg,#0d2010,#0a1f1c);"></div>
+        <span>Forest</span>
+      </div>
+      <div class="swatch" data-preset="aurora">
+        <div class="swatch-preview" style="background:linear-gradient(135deg,#1a0d30,#001a30);"></div>
+        <span>Aurora</span>
+      </div>
+      <div class="swatch" data-preset="custom">
+        <div class="swatch-preview" id="customSwatchPreview" style="background:#161616;"></div>
+        <span>Custom</span>
+      </div>
+    </div>
+
+    <div id="customColorPanel" style="display:none;">
+      <div class="color-row">
+        <div class="color-row-label">
+          <span class="color-swatch-dot" id="blob1Dot" style="background:#5533ff;"></span>
+          Accent Color 1
+        </div>
+        <input type="color" id="blob1ColorPicker" class="color-input" value="#5533ff">
+      </div>
+      <div class="color-row">
+        <div class="color-row-label">
+          <span class="color-swatch-dot" id="blob2Dot" style="background:#8833ff;"></span>
+          Accent Color 2
+        </div>
+        <input type="color" id="blob2ColorPicker" class="color-input" value="#8833ff">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Low-end guard ──
+  (function(){ if(navigator.hardwareConcurrency<=4) document.body.classList.add('low-end'); })();
+
+  // ── Haptics ──
+  function hapticFeedback(d){ if('vibrate' in navigator && d>0) navigator.vibrate(d); }
+  function getHapticIntensity(){ return parseInt(localStorage.getItem('hapticsIntensity')||'50'); }
+  function shouldHapticAll(){ return localStorage.getItem('hapticsAll')==='true'; }
+  function shouldHapticController(){ return localStorage.getItem('hapticsController')==='true'; }
+  function addHaptic(el,cb){
+    el.addEventListener('click',function(e){
+      if(shouldHapticAll()) hapticFeedback(getHapticIntensity());
+      if(cb) cb(e);
+    });
+  }
+
+  // ── Global State ──
+  let mqttClient=null, devices=[], currentUser=null;
+  let deviceOnlineStatus={}, deviceTimeouts={}, deviceListTimeout=null, renderTimeout=null;
+  let currentSortBy=localStorage.getItem('sortBy')||'rank';
+  let currentFilter='all', searchQuery='';
+  let devicePowerStatus={}, deviceSwipeState={};
+
+  // ── Init ──
+  function init(){
+    currentUser=JSON.parse(sessionStorage.getItem('current_user')||'null');
+    if(!currentUser){
+      const r=localStorage.getItem('remembered_user');
+      if(r){ try{ currentUser=JSON.parse(r); sessionStorage.setItem('current_user',r); }catch(e){ currentUser=null; } }
+    }
+    if(!currentUser){ window.location.href='login.html'; return; }
+
+    const emailEl=document.getElementById('userEmailHero');
+    if(emailEl) emailEl.textContent=currentUser.email;
+
+    loadTheme();
+    updateHero();
+    loadSavedPreset();
+    loadLayout();
+    loadHapticsSettings();
+    setupEventListeners();
+    setupPersonalizeListeners();
+    connectMQTT();
+
+    currentSortBy=localStorage.getItem('sortBy')||'rank';
+    updateSortLabel();
+    syncSortSheet();
+
+    document.getElementById('quickControlToggle').checked=localStorage.getItem('quickControl')==='true';
+    document.getElementById('rememberMeToggle').checked=localStorage.getItem('rememberMe')==='true';
+  }
+
+  // ── Hero greeting ──
+  function updateHero(){
+    const h=new Date().getHours();
+    const name=(localStorage.getItem('displayName')||(currentUser?currentUser.email.split('@')[0]:'')).trim();
+    let prefix,desc;
+    if(h>=5&&h<11){   prefix='Morning,';  desc='The sun is rising. Your natural light sequence has begun.'; }
+    else if(h>=11&&h<17){ prefix='Good day,'; desc='Solar efficiency at 94%. Energy storage nearly full.'; }
+    else if(h>=17&&h<21){ prefix='Evening,';  desc='Sunlight fading. Deep Focus mode is recommended.'; }
+    else{                  prefix='Night,';    desc='All nodes are silent. Rest well, your home is watching.'; }
+    document.getElementById('greeting').innerHTML=`${prefix}<br><strong>${name||'there'}</strong>`;
+    document.getElementById('status-desc').textContent=desc;
+  }
+
+  // ── Event Listeners ──
+  function setupEventListeners(){
+    const overlay=document.getElementById('overlay');
+    overlay.addEventListener('click', closeAllSheets);
+
+    addHaptic(document.getElementById('moreOptionsDockBtn'), showSettingsSheet);
+    addHaptic(document.getElementById('addDeviceBtn'), addDevice);
+    addHaptic(document.getElementById('sortBtn'), showSortSheet);
+    addHaptic(document.getElementById('refreshItem'), refreshDevices);
+    addHaptic(document.getElementById('themeToggleItem'), toggleTheme);
+    addHaptic(document.getElementById('layoutItem'), showLayoutSheet);
+    addHaptic(document.getElementById('hapticsItem'), showHapticsSheet);
+    addHaptic(document.getElementById('logoutItem'), logout);
+
+    addHaptic(document.getElementById('searchDockBtn'), toggleSearch);
+
+    document.getElementById('hapticsBack').addEventListener('click', ()=>{ closeAllSheets(); showSettingsSheet(); });
+    document.getElementById('sortBack').addEventListener('click', ()=>{ closeAllSheets(); showSettingsSheet(); });
+    document.getElementById('layoutBack').addEventListener('click', ()=>{ closeAllSheets(); showSettingsSheet(); });
+    document.getElementById('personalizeBack').addEventListener('click', closeAllSheets);
+
+    // Layout options
+    document.querySelectorAll('.layout-opt').forEach(r=>{
+      addHaptic(r,()=>{ applyLayout(r.dataset.layout); setTimeout(closeAllSheets,280); });
+    });
+
+    // Sort options
+    document.querySelectorAll('.sort-opt').forEach(o=>{
+      addHaptic(o,()=>{
+        document.querySelectorAll('.sort-opt').forEach(x=>x.classList.remove('active'));
+        o.classList.add('active');
+        currentSortBy=o.dataset.sort;
+        localStorage.setItem('sortBy',currentSortBy);
+        updateSortLabel();
+        renderDevices();
+        setTimeout(closeAllSheets,280);
+      });
+    });
+
+    document.getElementById('hapticsIntensity').addEventListener('input',function(){
+      updateIntensityDisplay();
+      saveHapticsSettings();
+      hapticFeedback(parseInt(this.value));
+    });
+    document.getElementById('hapticsController').addEventListener('change',saveHapticsSettings);
+    document.getElementById('hapticsAll').addEventListener('change',saveHapticsSettings);
+
+    const si=document.getElementById('searchInput');
+    si.addEventListener('input',e=>{
+      searchQuery=e.target.value.toLowerCase();
+      document.getElementById('clearSearch').classList.toggle('show',searchQuery.length>0);
+      renderDevices();
+    });
+    document.getElementById('clearSearch').addEventListener('click',()=>{
+      si.value=''; searchQuery='';
+      document.getElementById('clearSearch').classList.remove('show');
+      renderDevices();
+    });
+
+    document.querySelectorAll('.chip').forEach(c=>{
+      c.addEventListener('click',()=>{
+        document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
+        c.classList.add('active');
+        currentFilter=c.dataset.filter;
+        renderDevices();
+      });
+    });
+
+    // Tooltip hold
+    makeHoldTooltip('qcInfoBtn','qcTooltip');
+    makeHoldTooltip('rmInfoBtn','rmTooltip');
+  }
+
+  function makeHoldTooltip(btnId,tipId){
+    let t=null;
+    const btn=document.getElementById(btnId);
+    const tip=document.getElementById(tipId);
+    if(!btn||!tip) return;
+    const show=()=>tip.style.display='block';
+    const hide=()=>{ clearTimeout(t); tip.style.display='none'; };
+    btn.addEventListener('mousedown',e=>{ e.stopPropagation(); t=setTimeout(show,300); });
+    btn.addEventListener('touchstart',e=>{ e.stopPropagation(); t=setTimeout(show,300); },{passive:true});
+    btn.addEventListener('mouseup',hide);
+    btn.addEventListener('mouseleave',hide);
+    btn.addEventListener('touchend',hide);
+    btn.addEventListener('touchcancel',hide);
+    btn.addEventListener('click',e=>e.stopPropagation());
+  }
+
+  // ── Sheet System ──
+  const SHEETS=['settingsSheet','hapticsSheet','sortSheet','layoutSheet','personalizeSheet'];
+  function openSheet(id){
+    document.getElementById('overlay').classList.add('show');
+    document.getElementById(id).classList.add('show');
+  }
+  function closeAllSheets(){
+    document.getElementById('overlay').classList.remove('show');
+    SHEETS.forEach(id=>document.getElementById(id).classList.remove('show'));
+  }
+  function showSettingsSheet(){ closeAllSheets(); openSheet('settingsSheet'); }
+  function showHapticsSheet(){ closeAllSheets(); loadHapticsSettings(); updateIntensityDisplay(); openSheet('hapticsSheet'); }
+  function showSortSheet(){ syncSortSheet(); openSheet('sortSheet'); }
+  function showLayoutSheet(){
+    closeAllSheets();
+    const saved=localStorage.getItem('deviceLayout')||'grid';
+    document.querySelectorAll('.layout-opt').forEach(r=>{
+      r.classList.toggle('active',r.dataset.layout===saved);
+      r.querySelector('.sort-check').style.opacity=r.classList.contains('active')?'1':'0';
+    });
+    openSheet('layoutSheet');
+  }
+
+  function syncSortSheet(){
+    document.querySelectorAll('.sort-opt').forEach(o=>{
+      o.classList.toggle('active',o.dataset.sort===currentSortBy);
+    });
+  }
+
+  function updateSortLabel(){
+    const labels={rank:'Rank',name:'Name',status:'Status',recent:'Recent'};
+    document.getElementById('sortLabel').textContent=labels[currentSortBy]||'Rank';
+  }
+
+  // ── Theme ──
+  function toggleTheme(){
+    const isLight=document.body.classList.toggle('light');
+    localStorage.setItem('lightTheme',isLight?'true':'false');
+    closeAllSheets();
+  }
+  function loadTheme(){ if(localStorage.getItem('lightTheme')==='true') document.body.classList.add('light'); }
+
+  // ── Layout ──
+  function applyLayout(layout){
+    const grid=document.getElementById('deviceGrid');
+    grid.className=`device-grid layout-${layout}`;
+    const labels={grid:'Grid — 2-column tiles',list:'List — Full-width rows',bento:'Bento — First card spans full',compact:'Compact — 3-column dense'};
+    const sub=document.getElementById('layoutSubtitle');
+    if(sub) sub.textContent=labels[layout]||'Choose layout';
+    localStorage.setItem('deviceLayout',layout);
+    document.querySelectorAll('.layout-opt').forEach(r=>{
+      r.classList.toggle('active',r.dataset.layout===layout);
+      r.querySelector('.sort-check').style.opacity=r.classList.contains('active')?'1':'0';
+    });
+  }
+  function loadLayout(){ applyLayout(localStorage.getItem('deviceLayout')||'grid'); }
+
+  // ── Search ──
+  function toggleSearch(){
+    const wrap=document.getElementById('searchWrap');
+    const visible=wrap.classList.toggle('visible');
+    if(visible) document.getElementById('searchInput').focus();
+    else{ document.getElementById('searchInput').value=''; searchQuery=''; renderDevices(); }
+  }
+
+  // ── Haptics Settings ──
+  function loadHapticsSettings(){
+    document.getElementById('hapticsController').checked=localStorage.getItem('hapticsController')==='true';
+    document.getElementById('hapticsAll').checked=localStorage.getItem('hapticsAll')==='true';
+    document.getElementById('hapticsIntensity').value=getHapticIntensity();
+    updateIntensityDisplay();
+  }
+  function updateIntensityDisplay(){ document.getElementById('intensityValue').textContent=document.getElementById('hapticsIntensity').value+'ms'; }
+  function saveHapticsSettings(){
+    localStorage.setItem('hapticsController',document.getElementById('hapticsController').checked);
+    localStorage.setItem('hapticsAll',document.getElementById('hapticsAll').checked);
+    localStorage.setItem('hapticsIntensity',document.getElementById('hapticsIntensity').value);
+  }
+
+  // ── Personalize ──
+  const PRESETS={
+    dynamic:null,
+    ocean:  {bg:'#050e18'},
+    sunset: {bg:'#0f0305'},
+    forest: {bg:'#050f07'},
+    aurora: {bg:'#07030f'},
+    custom: null
+  };
+
+  function applyPreset(preset){
+    document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
+    document.querySelector(`.swatch[data-preset="${preset}"]`)?.classList.add('active');
+    const panel=document.getElementById('customColorPanel');
+    if(preset==='custom'){
+      panel.style.display='block';
+      localStorage.setItem('bgPreset','custom');
+      applyCustomColors();
+    } else {
+      panel.style.display='none';
+      localStorage.setItem('bgPreset',preset);
+      if(PRESETS[preset]&&PRESETS[preset].bg){
+        document.documentElement.style.setProperty('--bg', PRESETS[preset].bg);
+        document.documentElement.style.setProperty('--surface-0', adjustColor(PRESETS[preset].bg,8));
+        document.documentElement.style.setProperty('--surface-1', adjustColor(PRESETS[preset].bg,14));
+        document.documentElement.style.setProperty('--surface-2', adjustColor(PRESETS[preset].bg,20));
+      } else {
+        // Reset to defaults
+        document.documentElement.style.removeProperty('--bg');
+        document.documentElement.style.removeProperty('--surface-0');
+        document.documentElement.style.removeProperty('--surface-1');
+        document.documentElement.style.removeProperty('--surface-2');
+      }
+    }
+  }
+
+  function adjustColor(hex, amount){
+    const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+    const nr=Math.min(255,r+amount), ng=Math.min(255,g+amount), nb=Math.min(255,b+amount);
+    return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
+  }
+
+  function applyCustomColors(){
+    const c1=localStorage.getItem('customBlob1')||'#5533ff';
+    const c2=localStorage.getItem('customBlob2')||'#8833ff';
+    document.getElementById('blob1ColorPicker').value=c1;
+    document.getElementById('blob2ColorPicker').value=c2;
+    document.getElementById('blob1Dot').style.background=c1;
+    document.getElementById('blob2Dot').style.background=c2;
+    const p=document.getElementById('customSwatchPreview');
+    if(p) p.style.background=`linear-gradient(135deg,${c1},${c2})`;
+    // derive bg from color1
+    const bg=darkenHex(c1);
+    document.documentElement.style.setProperty('--bg',bg);
+    document.documentElement.style.setProperty('--surface-1',adjustColor(bg,14));
+  }
+
+  function darkenHex(hex){
+    const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+    // return very dark tinted bg
+    const nr=Math.round(r*20), ng=Math.round(g*20), nb=Math.round(b*20);
+    return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
+  }
+
+  function loadSavedPreset(){
+    const preset=localStorage.getItem('bgPreset')||'dynamic';
+    if(preset==='custom') applyCustomColors();
+    else if(preset!=='dynamic') applyPreset(preset);
+    document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
+    document.querySelector(`.swatch[data-preset="${preset}"]`)?.classList.add('active');
+  }
+
+  function openPersonalizeSheet(){
+    document.getElementById('displayNameInput').value=localStorage.getItem('displayName')||'';
+    const preset=localStorage.getItem('bgPreset')||'dynamic';
+    document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
+    document.querySelector(`.swatch[data-preset="${preset}"]`)?.classList.add('active');
+    document.getElementById('customColorPanel').style.display=preset==='custom'?'block':'none';
+    if(preset==='custom') applyCustomColors();
+    openSheet('personalizeSheet');
+  }
+
+  function setupPersonalizeListeners(){
+    addHaptic(document.getElementById('personalizeDockBtn'), openPersonalizeSheet);
+
+    document.getElementById('saveDisplayName').addEventListener('click',function(){
+      const val=document.getElementById('displayNameInput').value.trim();
+      if(val){ localStorage.setItem('displayName',val); updateHero(); }
+      this.textContent='✓ Saved'; this.classList.add('saved');
+      setTimeout(()=>{ this.textContent='Save'; this.classList.remove('saved'); },1800);
+    });
+
+    document.getElementById('displayNameInput').addEventListener('keydown',function(e){
+      if(e.key==='Enter'){ e.preventDefault(); document.getElementById('saveDisplayName').click(); }
+    });
+
+    document.querySelectorAll('.swatch').forEach(s=>{
+      s.addEventListener('click',()=>applyPreset(s.dataset.preset));
+    });
+
+    document.getElementById('blob1ColorPicker').addEventListener('input',function(){
+      const c1=this.value, c2=document.getElementById('blob2ColorPicker').value;
+      localStorage.setItem('customBlob1',c1);
+      document.getElementById('blob1Dot').style.background=c1;
+      const p=document.getElementById('customSwatchPreview');
+      if(p) p.style.background=`linear-gradient(135deg,${c1},${c2})`;
+      const bg=darkenHex(c1);
+      document.documentElement.style.setProperty('--bg',bg);
+      document.documentElement.style.setProperty('--surface-1',adjustColor(bg,14));
+    });
+
+    document.getElementById('blob2ColorPicker').addEventListener('input',function(){
+      const c2=this.value, c1=document.getElementById('blob1ColorPicker').value;
+      localStorage.setItem('customBlob2',c2);
+      document.getElementById('blob2Dot').style.background=c2;
+      const p=document.getElementById('customSwatchPreview');
+      if(p) p.style.background=`linear-gradient(135deg,${c1},${c2})`;
+    });
+  }
+
+  // ── Stats ──
+  function updateStats(){
+    const total=devices.length;
+    const online=devices.filter(d=>{
+      const s=deviceOnlineStatus[d.device_id];
+      return s&&s!=='offline'&&s!=='Checking...';
+    }).length;
+    document.getElementById('chipTotal').textContent=total;
+    document.getElementById('chipOnline').textContent=online;
+    document.getElementById('chipOffline').textContent=total-online;
+  }
+
+  // ── Sort & Filter ──
+  function sortDevices(list){
+    const s=[...list];
+    switch(currentSortBy){
+      case 'name': s.sort((a,b)=>a.device_id.localeCompare(b.device_id)); break;
+      case 'status':
+        const on=s.filter(d=>deviceOnlineStatus[d.device_id]!=='offline'&&deviceOnlineStatus[d.device_id]!=='Checking...');
+        const off=s.filter(d=>deviceOnlineStatus[d.device_id]==='offline'||deviceOnlineStatus[d.device_id]==='Checking...');
+        return [...on,...off];
+      case 'recent': s.reverse(); break;
+      default: s.sort((a,b)=>a.device_rank-b.device_rank);
+    }
+    return s;
+  }
+
+  function filterDevices(list){
+    let f=list;
+    if(searchQuery) f=f.filter(d=>d.device_id.toLowerCase().includes(searchQuery));
+    if(currentFilter==='online') f=f.filter(d=>deviceOnlineStatus[d.device_id]!=='offline'&&deviceOnlineStatus[d.device_id]!=='Checking...');
+    else if(currentFilter==='offline') f=f.filter(d=>deviceOnlineStatus[d.device_id]==='offline'||deviceOnlineStatus[d.device_id]==='Checking...');
+    return f;
+  }
+
+  // ── Render ──
+  function renderDevices(){
+    if(renderTimeout) clearTimeout(renderTimeout);
+    renderTimeout=setTimeout(()=>{
+      const grid=document.getElementById('deviceGrid');
+      const layout=localStorage.getItem('deviceLayout')||'grid';
+      grid.className=`device-grid layout-${layout}`;
+      updateStats();
+
+      if(devices.length===0){
+        grid.innerHTML=`
+          <div class="state-block">
+            <div class="state-icon"><i class="fa-solid fa-plug-circle-plus"></i></div>
+            <div class="state-title">No Devices Found</div>
+            <div class="state-sub">Tap the + button to add your first smart device</div>
+          </div>`;
+        return;
+      }
+
+      let list=filterDevices(devices);
+      list=sortDevices(list);
+
+      if(list.length===0){
+        grid.innerHTML=`
+          <div class="state-block">
+            <div class="state-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+            <div class="state-title">No Matches</div>
+            <div class="state-sub">Try adjusting your search or filter</div>
+          </div>`;
+        return;
+      }
+
+      const frag=document.createDocumentFragment();
+      const qcEnabled=localStorage.getItem('quickControl')==='true';
+
+      list.forEach(device=>{
+        const msg=deviceOnlineStatus[device.device_id]||'offline';
+        const isOnline=!(msg==='offline'||msg==='Checking...');
+        const isChecking=msg==='Checking...';
+
+        const card=document.createElement('div');
+        let cls='device-card';
+        if(isOnline) cls+=' online';
+        else if(isChecking) cls+=' checking';
+        card.className=cls;
+        card.dataset.deviceId=device.device_id;
+
+        if(qcEnabled&&isOnline){
+          card.classList.add('swipeable');
+          if(deviceSwipeState[device.device_id]) card.classList.add('swiped');
+          const knownState=devicePowerStatus[device.device_id]||null;
+          const btnState=knownState==='ON'?'state-on':knownState==='OFF'?'state-off':'state-unknown';
+          const labelText=knownState==='ON'?'ON':knownState==='OFF'?'OFF':'—';
+          const trackClass=deviceSwipeState[device.device_id]?'card-track revealed':'card-track';
+          card.innerHTML=`
+            <div class="${trackClass}">
+              <div class="card-panel card-panel-info">
+                <div class="card-top">
+                  <div class="device-icon"><i class="fa-solid fa-plug-circle-bolt"></i></div>
+                  <div class="card-status-dot"></div>
+                </div>
+                <div class="card-bottom">
+                  <div class="device-name">${device.device_id}</div>
+                  <div class="device-status-text">${msg}</div>
+                </div>
+                <div class="swipe-hint"><i class="fa-solid fa-chevron-left"></i></div>
+              </div>
+              <div class="card-panel card-panel-control" style="position:relative;">
+                <i class="fa-solid fa-chevron-right qc-back-hint"></i>
+                <button class="qc-power-btn ${btnState}" data-device-id="${device.device_id}" onclick="event.stopPropagation();quickToggleDevice('${device.device_id}',this)">
+                  <i class="fa-solid fa-power-off"></i>
+                </button>
+                <span class="qc-label ${btnState}">${labelText}</span>
+              </div>
+            </div>`;
+          attachSwipeListeners(card,device.device_id);
+        } else {
+          const statusClass=isChecking?'checking':isOnline?'online':'offline';
+          card.innerHTML=`
+            <div class="card-top">
+              <div class="device-icon"><i class="fa-solid fa-plug-circle-bolt"></i></div>
+              <div class="card-status-dot"></div>
+            </div>
+            <div class="card-bottom">
+              <div class="device-name">${device.device_id}</div>
+              <div class="device-status-text device-status-${statusClass}">${msg}</div>
+            </div>`;
+          addHaptic(card,()=>openDeviceControl(device.device_id));
+        }
+
+        frag.appendChild(card);
+      });
+
+      grid.innerHTML='';
+      grid.appendChild(frag);
+      updateStats();
+    },80);
+  }
+
+  // ── MQTT ──
+  function connectMQTT(){
+    try{
+      mqttClient=mqtt.connect('wss://y1dda1f8.ala.asia-southeast1.emqxsl.com:8084/mqtt',{
+        username:'AADAconnect',
+        password:'wMhtXcU86UtV-48'
+      });
+      mqttClient.on('connect',()=>{
+        document.getElementById('mqttDot').classList.add('connected');
+        const t=`smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/fetch`;
+        mqttClient.subscribe(t,err=>{
+          if(!err){ deviceListTimeout=setTimeout(()=>{ if(devices.length===0) renderDevices(); },5000); }
+        });
+      });
+      mqttClient.on('message',(topic,message)=>handleMQTTMessage(topic,message));
+      const onErr=()=>{ document.getElementById('mqttDot').classList.remove('connected'); if(devices.length===0) renderDevices(); };
+      mqttClient.on('error',onErr);
+      mqttClient.on('close',onErr);
+    } catch(e){ renderDevices(); }
+  }
+
+  function handleMQTTMessage(topic,message){
+    const parts=topic.split('/');
+    const last=parts[parts.length-1];
+
+    if(last==='fetch'){
+      clearTimeout(deviceListTimeout);
+      try{
+        const data=JSON.parse(message.toString());
+        if(data.device_list&&Array.isArray(data.device_list)){
+          devices=data.device_list;
+          renderDevices();
+          setTimeout(()=>{
+            devices.forEach(d=>{
+              deviceOnlineStatus[d.device_id]='Checking...';
+              updateDeviceOnlineStatus(d.device_id,'Checking...',false);
+              const ofTopic=`smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${d.device_id}/OF`;
+              clearTimeout(deviceTimeouts[d.device_id]);
+              mqttClient.publish(ofTopic,'check_status');
+              deviceTimeouts[d.device_id]=setTimeout(()=>{
+                if(deviceOnlineStatus[d.device_id]==='Checking...'){
+                  deviceOnlineStatus[d.device_id]='offline';
+                  updateDeviceOnlineStatus(d.device_id,'offline',false);
+                }
+              },5000);
+              if(localStorage.getItem('quickControl')==='true'){
+                mqttClient.subscribe(`smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${d.device_id}/status`);
+              }
+            });
+          },80);
+        }
+      } catch(e){}
+      return;
+    }
+
+    if(last==='OF'){
+      const deviceId=parts[parts.length-2];
+      const msg=message.toString().trim();
+      const isOnline=msg!=='offline'&&msg!=='';
+      deviceOnlineStatus[deviceId]=isOnline?msg:'offline';
+      clearTimeout(deviceTimeouts[deviceId]);
+      updateDeviceOnlineStatus(deviceId,isOnline?msg:'offline',isOnline);
+      return;
+    }
+
+    if(last==='status'){
+      const deviceId=parts[parts.length-2];
+      const s=message.toString().trim().toUpperCase();
+      if(s==='ON'||s==='OFF'){
+        devicePowerStatus[deviceId]=s;
+        document.querySelectorAll(`.device-card[data-device-id="${deviceId}"]`).forEach(card=>{
+          const isOnline=deviceOnlineStatus[deviceId]!=='offline'&&deviceOnlineStatus[deviceId]!=='Checking...';
+          updateQcPanel(card,deviceId,isOnline);
+        });
+      }
+    }
+  }
+
+  // ── Device Status Update ──
+  function updateDeviceOnlineStatus(deviceId,message,isOnline){
+    document.querySelectorAll(`.device-card[data-device-id="${deviceId}"]`).forEach(card=>{
+      card.classList.toggle('online',isOnline);
+      card.classList.toggle('checking',message==='Checking...');
+      const dot=card.querySelector('.card-status-dot');
+      if(dot){
+        dot.style.background=isOnline?'var(--online)':message==='Checking...'?'var(--text-3)':'var(--offline)';
+        if(isOnline) dot.style.boxShadow='0 0 6px var(--online)';
+        else dot.style.boxShadow='none';
+      }
+      const statusEl=card.querySelector('.device-status-text');
+      if(statusEl) statusEl.textContent=message;
+      // Update icon color
+      const icon=card.querySelector('.device-icon');
+      if(icon){
+        if(isOnline){ icon.style.background='rgba(74,222,128,0.1)'; icon.style.borderColor='rgba(74,222,128,0.2)'; icon.style.color='var(--online)'; }
+        else{ icon.style.background=''; icon.style.borderColor=''; icon.style.color=''; }
+      }
+      updateQcPanel(card,deviceId,isOnline);
+    });
+    debouncedUpdateStats();
+    if(currentSortBy==='status') debouncedRenderDevices();
+  }
+
+  let _st=null; function debouncedUpdateStats(){ clearTimeout(_st); _st=setTimeout(updateStats,150); }
+  let _rt=null; function debouncedRenderDevices(){ clearTimeout(_rt); _rt=setTimeout(renderDevices,300); }
+
+  // ── QC Panel ──
+  function updateQcPanel(card,deviceId,isOnline){
+    const btn=card.querySelector('.qc-power-btn');
+    const label=card.querySelector('.qc-label');
+    if(!btn||btn.classList.contains('state-pending')) return;
+    const s=devicePowerStatus[deviceId]||null;
+    btn.className='qc-power-btn';
+    if(label) label.className='qc-label';
+    if(!isOnline){
+      btn.classList.add('state-unknown'); btn.disabled=true;
+      if(label){ label.classList.add('state-unknown'); label.textContent='Offline'; }
+    } else if(s==='ON'){
+      btn.classList.add('state-on'); btn.disabled=false;
+      if(label){ label.classList.add('state-on'); label.textContent='ON'; }
+    } else if(s==='OFF'){
+      btn.classList.add('state-off'); btn.disabled=false;
+      if(label){ label.classList.add('state-off'); label.textContent='OFF'; }
+    } else {
+      btn.classList.add('state-unknown'); btn.disabled=false;
+      if(label){ label.classList.add('state-unknown'); label.textContent='—'; }
+    }
+  }
+
+  function quickToggleDevice(deviceId,btn){
+    if(!mqttClient||!mqttClient.connected){ alert('Not connected to server'); return; }
+    if(btn.classList.contains('state-pending')) return;
+    const isOnline=deviceOnlineStatus[deviceId]!=='offline'&&deviceOnlineStatus[deviceId]!=='Checking...'&&deviceOnlineStatus[deviceId]!=='unknown';
+    if(!isOnline) return;
+    const command=devicePowerStatus[deviceId]==='ON'?'0':'1';
+    const label=btn.closest('.card-panel-control')?.querySelector('.qc-label');
+    btn.className='qc-power-btn state-pending';
+    if(label){ label.className='qc-label state-pending'; label.textContent='…'; }
+    if(shouldHapticAll()||shouldHapticController()) hapticFeedback(getHapticIntensity());
+    mqttClient.publish(`smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${deviceId}/control`,command);
+    setTimeout(()=>{
+      if(btn.classList.contains('state-pending')){
+        const c=btn.closest('.device-card');
+        if(c) updateQcPanel(c,deviceId,isOnline);
+      }
+    },5000);
+  }
+
+  // ── Swipe ──
+  function attachSwipeListeners(card,deviceId){
+    let startX=0,startY=0,startT=0,dragging=false,didScroll=false;
+    card.addEventListener('touchstart',e=>{
+      startX=e.touches[0].clientX; startY=e.touches[0].clientY;
+      startT=Date.now(); dragging=true; didScroll=false;
+    },{passive:true});
+    card.addEventListener('touchmove',e=>{
+      if(!dragging) return;
+      const dx=e.touches[0].clientX-startX, dy=e.touches[0].clientY-startY;
+      const angle=Math.abs(Math.atan2(dy,dx)*180/Math.PI);
+      if(angle>35&&angle<145) didScroll=true;
+    },{passive:true});
+    card.addEventListener('touchend',e=>{
+      if(!dragging||didScroll){ dragging=false; return; }
+      dragging=false;
+      const dx=e.changedTouches[0].clientX-startX;
+      const dt=Date.now()-startT;
+      const isSwipe=Math.abs(dx)>36||(Math.abs(dx)>18&&dt<250);
+      if(!isSwipe){
+        const track=card.querySelector('.card-track');
+        if(!track||!track.classList.contains('revealed')) openDeviceControl(deviceId);
+        return;
+      }
+      const track=card.querySelector('.card-track');
+      if(!track) return;
+      const revealed=track.classList.contains('revealed');
+      if(dx<0&&!revealed){ track.classList.add('revealed'); deviceSwipeState[deviceId]=true; }
+      else if(dx>0&&revealed){ track.classList.remove('revealed'); deviceSwipeState[deviceId]=false; }
+      else if(dx>0&&!revealed){ openDeviceControl(deviceId); }
+    },{passive:true});
+  }
+
+  // ── Device Actions ──
+  function openDeviceControl(deviceId){
+    sessionStorage.setItem('active_device',deviceId);
+    sessionStorage.setItem('device_status_cache',JSON.stringify({
+      status:deviceOnlineStatus[deviceId]||'unknown',
+      isOnline:deviceOnlineStatus[deviceId]!=='offline'&&deviceOnlineStatus[deviceId]!=='Checking...'&&deviceOnlineStatus[deviceId]!=='unknown',
+      timestamp:Date.now()
+    }));
+    window.location.href='control.html';
+  }
+
+  function addDevice(){
+    closeAllSheets();
+    const deviceId='AADA-'+Math.random().toString(36).substr(2,8).toUpperCase();
+    sessionStorage.setItem('provisioning',JSON.stringify({
+      email:currentUser.email, password:currentUser.password,
+      hashed_email:currentUser.hashed_email, hashed_password:currentUser.hashed_password,
+      device_id:deviceId
+    }));
+    window.location.href='wifi_setup.html';
+  }
+
+  function refreshDevices(){
+    closeAllSheets();
+    if(!mqttClient||!mqttClient.connected){ alert('Not connected to server'); return; }
+    devices.forEach(d=>{
+      deviceOnlineStatus[d.device_id]='Checking...';
+      updateDeviceOnlineStatus(d.device_id,'Checking...',false);
+      const ofTopic=`smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${d.device_id}/OF`;
+      clearTimeout(deviceTimeouts[d.device_id]);
+      mqttClient.publish(ofTopic,'check_status');
+      deviceTimeouts[d.device_id]=setTimeout(()=>{
+        if(deviceOnlineStatus[d.device_id]==='Checking...'){
+          deviceOnlineStatus[d.device_id]='offline';
+          updateDeviceOnlineStatus(d.device_id,'offline',false);
+        }
+      },5000);
+    });
+    const grid=document.getElementById('deviceGrid');
+    grid.style.opacity='0.4';
+    setTimeout(()=>grid.style.opacity='1',350);
+  }
+
+  function logout(){
+    closeAllSheets();
+    if(confirm('Are you sure you want to logout?')){
+      localStorage.removeItem('remembered_user');
+      localStorage.removeItem('rememberMe');
+      sessionStorage.clear();
+      window.location.href='login.html';
+    }
+  }
+
+  function toggleRememberMe(enabled){
+    localStorage.setItem('rememberMe',enabled?'true':'false');
+    if(enabled&&currentUser) localStorage.setItem('remembered_user',JSON.stringify(currentUser));
+    else localStorage.removeItem('remembered_user');
+  }
+
+  function toggleQuickControl(enabled){
+    localStorage.setItem('quickControl',enabled?'true':'false');
+    if(enabled&&mqttClient&&mqttClient.connected){
+      devices.forEach(d=>{
+        mqttClient.subscribe(`smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${d.device_id}/status`);
+      });
+    }
+    deviceSwipeState={};
+    renderDevices();
+  }
+
+  // ── Boot ──
+  window.onload=init;
+  window.addEventListener('pageshow',e=>{ if(e.persisted) init(); });
+  setInterval(updateHero, 60000);
+</script>
+</body>
+</html>
