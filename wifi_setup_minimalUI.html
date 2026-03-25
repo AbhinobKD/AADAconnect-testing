@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#090909">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AADAconnect | WiFi Setup</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    /* ── Design Tokens (exact dashboard match) ── */
+    :root {
+      --bg:            #090909;
+      --surface-0:     #101010;
+      --surface-1:     #161616;
+      --surface-2:     #1c1c1c;
+      --surface-3:     #232323;
+      --border:        rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.14);
+      --text-1:        #f5f5f5;
+      --text-2:        rgba(245,245,245,0.55);
+      --text-3:        rgba(245,245,245,0.28);
+      --accent:        #e8ff5a;
+      --accent-dim:    rgba(232,255,90,0.12);
+      --accent-border: rgba(232,255,90,0.3);
+      --online:        #4ade80;
+      --online-dim:    rgba(74,222,128,0.12);
+      --danger:        #ff5a5a;
+      --danger-dim:    rgba(255,90,90,0.12);
+      --r-xs: 8px;
+      --r-sm: 12px;
+      --r-md: 16px;
+      --r-lg: 20px;
+      --r-xl: 24px;
+      --r-2xl: 32px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
+    }
+
+    body.light {
+      --bg:            #f2f2f0;
+      --surface-0:     #f9f9f7;
+      --surface-1:     #ffffff;
+      --surface-2:     #f4f4f2;
+      --surface-3:     #ebebea;
+      --border:        rgba(0,0,0,0.07);
+      --border-strong: rgba(0,0,0,0.13);
+      --text-1:        #111111;
+      --text-2:        rgba(17,17,17,0.5);
+      --text-3:        rgba(17,17,17,0.28);
+      --accent:        #5a6e00;
+      --accent-dim:    rgba(90,110,0,0.1);
+      --accent-border: rgba(90,110,0,0.25);
+    }
+
+    *, *::before, *::after {
+      margin: 0; padding: 0;
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html { height: -webkit-fill-available; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Noise texture ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.025;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── App Shell ── */
+    .app {
+      width: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      min-height: 100vh;
+      padding: 0 0 120px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Top Bar ── */
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 20px 0;
+      height: 72px;
+    }
+
+    .brand {
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      color: var(--text-1);
+    }
+    .brand span {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-left: 2px;
+      vertical-align: middle;
+      margin-bottom: 2px;
+    }
+
+    .icon-btn {
+      width: 38px; height: 38px;
+      border-radius: var(--r-sm);
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.15s;
+      color: var(--text-2);
+      font-size: 0.85rem;
+      text-decoration: none;
+    }
+    .icon-btn:active { transform: scale(0.92); background: var(--surface-2); }
+
+    /* ── Page header ── */
+    .page-header {
+      padding: 24px 20px 20px;
+    }
+    .page-title {
+      font-size: 1.8rem;
+      font-weight: 300;
+      letter-spacing: -0.8px;
+      line-height: 1.15;
+      color: var(--text-1);
+      margin-bottom: 6px;
+    }
+    .page-title strong { font-weight: 700; }
+    .page-desc {
+      font-size: 0.85rem;
+      color: var(--text-2);
+      font-style: italic;
+    }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-3);
+      padding: 0 20px;
+      margin: 24px 0 12px;
+    }
+
+    /* ── Content padding ── */
+    .content {
+      padding: 0 20px;
+    }
+
+    /* ── Device code tile ── */
+    .device-tile {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .device-tile-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .device-tile-icon {
+      width: 40px; height: 40px;
+      border-radius: var(--r-sm);
+      background: var(--accent-dim);
+      border: 1px solid var(--accent-border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--accent);
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .device-tile-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-3);
+      margin-bottom: 3px;
+    }
+    .device-tile-code {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-1);
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 1px;
+    }
+
+    /* ── Instructions card ── */
+    .info-card {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 18px 20px;
+    }
+    .info-card-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-1);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .info-card-title i {
+      color: var(--accent);
+      font-size: 0.8rem;
+    }
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .step-num {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--text-3);
+      flex-shrink: 0;
+      margin-top: 1px;
+      font-family: 'DM Mono', monospace;
+    }
+    .step-text {
+      font-size: 0.82rem;
+      color: var(--text-2);
+      line-height: 1.55;
+    }
+    .step-text strong {
+      color: var(--text-1);
+      font-weight: 600;
+    }
+
+    /* ── Form card ── */
+    .form-card {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 20px;
+    }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group:last-of-type { margin-bottom: 0; }
+
+    .field-label {
+      display: block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-3);
+      margin-bottom: 8px;
+      padding-left: 2px;
+    }
+
+    .input-wrapper { position: relative; }
+
+    .input-icon {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%);
+      width: 16px; height: 16px;
+      stroke: var(--text-3); pointer-events: none;
+    }
+
+    .password-toggle {
+      position: absolute; right: 14px; top: 50%;
+      transform: translateY(-50%);
+      width: 16px; height: 16px;
+      stroke: var(--text-3); cursor: pointer;
+      z-index: 10; transition: opacity 0.15s;
+    }
+    .password-toggle:active { opacity: 0.6; }
+
+    input {
+      width: 100%;
+      padding: 13px 14px 13px 42px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text-1);
+      font-size: 0.88rem;
+      font-family: 'DM Sans', sans-serif;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input.has-toggle { padding-right: 42px; }
+    input:focus {
+      border-color: var(--accent-border);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+    input::placeholder { color: var(--text-3); }
+    body.light input { background: var(--surface-2); }
+
+    /* ── Divider ── */
+    .form-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+    }
+
+    /* ── Buttons ── */
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .btn-primary {
+      flex: 2; padding: 14px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--r-md);
+      color: #090909;
+      font-weight: 700;
+      font-size: 0.88rem;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .btn-secondary {
+      flex: 1; padding: 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text-2);
+      font-weight: 600;
+      font-size: 0.88rem;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .btn-secondary:active { transform: scale(0.97); background: var(--surface-3); }
+
+    /* ── Status message ── */
+    .status-msg {
+      margin-top: 14px;
+      padding: 13px 16px;
+      border-radius: var(--r-md);
+      font-size: 0.82rem;
+      font-weight: 500;
+      display: none;
+      line-height: 1.5;
+      animation: fadeIn 0.25s ease;
+    }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+    .status-msg.info    { display:block; background:var(--accent-dim); border:1px solid var(--accent-border); color:var(--accent); }
+    .status-msg.success { display:block; background:var(--online-dim); border:1px solid rgba(74,222,128,0.3); color:var(--online); }
+    .status-msg.error   { display:block; background:var(--danger-dim); border:1px solid rgba(255,90,90,0.25); color:var(--danger); }
+
+    /* ── Nav Dock (dashboard exact) ── */
+    .dock-wrap {
+      position: fixed;
+      bottom: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      padding: 12px 20px 28px;
+      background: linear-gradient(to top, var(--bg) 60%, transparent);
+      z-index: 100;
+      pointer-events: none;
+    }
+    .dock {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface-1);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-2xl);
+      padding: 10px 16px;
+      pointer-events: all;
+      box-shadow: var(--shadow-lg);
+    }
+    .dock-item {
+      width: 42px; height: 42px;
+      border-radius: var(--r-md);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      color: var(--text-3);
+      font-size: 0.9rem;
+      transition: all 0.15s;
+      position: relative;
+      text-decoration: none;
+    }
+    .dock-item:active { transform: scale(0.88); }
+    .dock-item.active { color: var(--text-1); }
+    .dock-item.active::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 50%; transform: translateX(-50%);
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .dock-fab {
+      width: 44px; height: 44px;
+      border-radius: var(--r-md);
+      background: var(--accent);
+      color: #090909;
+      font-size: 1rem;
+      border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .dock-fab:active { transform: scale(0.88); }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="brand">AADAconnect<span></span></div>
+    <div class="icon-btn" onclick="goBack()" title="Back">
+      <i class="fa-solid fa-chevron-left"></i>
+    </div>
+  </header>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <h1 class="page-title">WiFi<br><strong>Setup</strong></h1>
+    <p class="page-desc">Configure your AADA Smart Plug</p>
+  </div>
+
+  <!-- Device Code -->
+  <div class="section-label">Your Device</div>
+  <div class="content">
+    <div class="device-tile">
+      <div class="device-tile-left">
+        <div class="device-tile-icon">
+          <i class="fa-solid fa-plug-circle-bolt"></i>
+        </div>
+        <div>
+          <div class="device-tile-label">Device ID</div>
+          <div class="device-tile-code" id="deviceCode">Loading…</div>
+        </div>
+      </div>
+      <i class="fa-solid fa-circle-check" style="color:var(--online);font-size:1rem;opacity:0.7;"></i>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="section-label">Setup Instructions</div>
+  <div class="content">
+    <div class="info-card">
+      <div class="info-card-title">
+        <i class="fa-solid fa-circle-info"></i>
+        Follow these steps
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">Connect your phone to the WiFi network: <strong>AADA-Plug</strong></div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">Enter your home WiFi credentials in the form below</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">Tap <strong>Configure Device</strong> to send settings to the plug</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text">Wait for the device to connect — it will appear in your dashboard</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WiFi Credentials Form -->
+  <div class="section-label">WiFi Credentials</div>
+  <div class="content">
+    <div class="form-card">
+      <form id="wifiForm" onsubmit="sendCredentials(event)">
+        <div class="form-group">
+          <label class="field-label" for="ssid">Network Name (SSID)</label>
+          <div class="input-wrapper">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+              <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+              <line x1="12" y1="20" x2="12.01" y2="20"/>
+            </svg>
+            <input type="text" id="ssid" placeholder="Your WiFi network name" autocomplete="off" required>
+          </div>
+        </div>
+
+        <div class="form-divider"></div>
+
+        <div class="form-group">
+          <label class="field-label" for="wifiPassword">WiFi Password</label>
+          <div class="input-wrapper">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <input type="password" id="wifiPassword" class="has-toggle" placeholder="Your WiFi password" autocomplete="off" required>
+            <svg class="password-toggle" id="togglePassword" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button type="button" class="btn-secondary" onclick="goBack()">Cancel</button>
+          <button type="submit" class="btn-primary" id="submitBtn">
+            <i class="fa-solid fa-paper-plane" style="margin-right:6px;font-size:0.8rem;"></i>Configure Device
+          </button>
+        </div>
+      </form>
+
+      <div class="status-msg" id="statusMessage"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Nav Dock -->
+<div class="dock-wrap">
+  <nav class="dock">
+    <div class="dock-item active" onclick="goHome()" title="Home">
+      <i class="fa-solid fa-house-chimney-window"></i>
+    </div>
+    <div class="dock-item" style="opacity:0.3;cursor:default;">
+      <i class="fa-solid fa-magnifying-glass"></i>
+    </div>
+    <div class="dock-fab" style="opacity:0.3;cursor:default;">
+      <i class="fa-solid fa-plus"></i>
+    </div>
+    <div class="dock-item" style="opacity:0.3;cursor:default;">
+      <i class="fa-solid fa-palette"></i>
+    </div>
+    <div class="dock-item" style="opacity:0.3;cursor:default;">
+      <i class="fa-solid fa-ellipsis-vertical"></i>
+    </div>
+  </nav>
+</div>
+
+<script>
+  let provisioningData = null;
+
+  function initTheme() {
+    const isLight = localStorage.getItem('lightMode') === 'true';
+    if (isLight) document.body.classList.add('light');
+  }
+
+  document.getElementById('togglePassword').addEventListener('click', function() {
+    const input = document.getElementById('wifiPassword');
+    const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+    input.setAttribute('type', type);
+    this.innerHTML = type === 'text'
+      ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+      : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  });
+
+  function init() {
+    initTheme();
+    const provStr = sessionStorage.getItem('provisioning');
+    if (!provStr) {
+      alert('No device to configure');
+      window.location.href = 'dashboard.html';
+      return;
+    }
+    provisioningData = JSON.parse(provStr);
+    document.getElementById('deviceCode').textContent = provisioningData.device_id;
+  }
+
+  function sendCredentials(event) {
+    event.preventDefault();
+    const ssid = document.getElementById('ssid').value.trim();
+    const wifiPassword = document.getElementById('wifiPassword').value;
+    const submitBtn = document.getElementById('submitBtn');
+    if (!ssid || !wifiPassword) { showStatus('Please fill in all fields', 'error'); return; }
+    const payload = {
+      ssid, pass: wifiPassword,
+      hashed_email: provisioningData.hashed_email,
+      hashed_password: provisioningData.hashed_password,
+      device_id: provisioningData.device_id
+    };
+    submitBtn.disabled = true;
+    showStatus('Sending configuration to device…', 'info');
+    fetch('http://192.168.4.1/prov', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(response => {
+      if (response.ok) return response.text();
+      throw new Error('Failed to configure device');
+    })
+    .then(() => {
+      showStatus('Device configured! Connecting to your network…', 'success');
+      sessionStorage.removeItem('provisioning');
+      setTimeout(() => { window.location.href = 'dashboard.html'; }, 2500);
+    })
+    .catch(() => {
+      showStatus('Could not reach device. Make sure you are connected to AADA-Plug WiFi.', 'error');
+      submitBtn.disabled = false;
+    });
+  }
+
+  function showStatus(message, type) {
+    const el = document.getElementById('statusMessage');
+    el.textContent = message;
+    el.className = 'status-msg ' + type;
+  }
+
+  function goHome() {
+    if (confirm('Return to dashboard? Device setup will be cancelled.')) {
+      sessionStorage.removeItem('provisioning');
+      window.location.href = 'dashboard.html';
+    }
+  }
+
+  function goBack() {
+    if (confirm('Are you sure? Device setup will be cancelled.')) {
+      sessionStorage.removeItem('provisioning');
+      window.location.href = 'dashboard.html';
+    }
+  }
+
+  window.onload = init;
+</script>
+</body>
+</html>
