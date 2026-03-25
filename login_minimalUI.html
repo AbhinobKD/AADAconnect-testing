@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#090909">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AADAconnect | Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    /* ── Design Tokens (matches dashboard exactly) ── */
+    :root {
+      --bg:            #090909;
+      --surface-0:     #101010;
+      --surface-1:     #161616;
+      --surface-2:     #1c1c1c;
+      --surface-3:     #232323;
+      --border:        rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.14);
+      --text-1:        #f5f5f5;
+      --text-2:        rgba(245,245,245,0.55);
+      --text-3:        rgba(245,245,245,0.28);
+      --accent:        #e8ff5a;
+      --accent-dim:    rgba(232,255,90,0.12);
+      --accent-border: rgba(232,255,90,0.3);
+      --online:        #4ade80;
+      --danger:        #ff5a5a;
+      --danger-dim:    rgba(255,90,90,0.12);
+      --r-xs: 8px;
+      --r-sm: 12px;
+      --r-md: 16px;
+      --r-lg: 20px;
+      --r-xl: 24px;
+      --r-2xl: 32px;
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
+      /* keep login-card compat vars */
+      --glass-border: rgba(255,255,255,0.12);
+      --accent-hue: 240;
+      --error-color: #ff5a5a;
+    }
+
+    body.light {
+      --bg:            #f2f2f0;
+      --surface-0:     #f9f9f7;
+      --surface-1:     #ffffff;
+      --surface-2:     #f4f4f2;
+      --surface-3:     #ebebea;
+      --border:        rgba(0,0,0,0.07);
+      --border-strong: rgba(0,0,0,0.13);
+      --text-1:        #111111;
+      --text-2:        rgba(17,17,17,0.5);
+      --text-3:        rgba(17,17,17,0.28);
+      --accent:        #5a6e00;
+      --accent-dim:    rgba(90,110,0,0.1);
+      --accent-border: rgba(90,110,0,0.25);
+      --glass-border:  rgba(0,0,0,0.1);
+    }
+
+    *, *::before, *::after {
+      margin: 0; padding: 0;
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html { height: -webkit-fill-available; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      overflow-x: hidden;
+      display: flex;
+      align-items: stretch;
+    }
+
+    /* ── Noise texture (dashboard) ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.025;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Page shell ── */
+    .login-container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    /* ── Top bar (dashboard style) ── */
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 20px 0;
+      height: 72px;
+      z-index: 10;
+    }
+
+    .brand {
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      color: var(--text-1);
+    }
+    .brand span {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-left: 2px;
+      vertical-align: middle;
+      margin-bottom: 2px;
+    }
+
+    /* ── Brand hero area (upper half) ── */
+    .brand-hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 100px 24px 32px;
+      text-align: center;
+    }
+
+    .brand-logo-icon {
+      width: 72px; height: 72px;
+      border-radius: var(--r-lg);
+      background: var(--surface-1);
+      border: 1px solid var(--border-strong);
+      overflow: hidden;
+      margin: 0 auto 20px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .brand-logo-icon img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+    }
+    .brand-logo-icon i {
+      font-size: 1.6rem;
+      color: var(--accent);
+    }
+
+    .brand-name {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.8px;
+      color: var(--text-1);
+      margin-bottom: 6px;
+    }
+    .brand-sub {
+      font-size: 0.82rem;
+      color: var(--text-2);
+      font-style: italic;
+    }
+
+    /* ── Login card — ORIGINAL DESIGN PRESERVED ── */
+    .login-card {
+      background: #0d0d14;
+      border: 1px solid var(--glass-border);
+      border-bottom: none;
+      border-radius: 32px 32px 0 0;
+      padding: 32px 24px 40px;
+      padding-bottom: max(env(safe-area-inset-bottom), 40px);
+      animation: slideUp 0.45s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    body.light .login-card {
+      background: #f8f8fc;
+      border-color: rgba(0,0,0,0.08);
+    }
+
+    .field-label {
+      display: block;
+      font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 1.5px; color: var(--text-2);
+      margin-bottom: 10px; padding-left: 4px;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .form-group { margin-bottom: 20px; position: relative; }
+    .input-wrapper { position: relative; }
+
+    .input-icon {
+      position: absolute; left: 16px; top: 50%;
+      transform: translateY(-50%);
+      width: 18px; height: 18px;
+      stroke: var(--text-2); pointer-events: none;
+      transition: stroke 0.3s;
+    }
+    .password-toggle {
+      position: absolute; right: 16px; top: 50%;
+      transform: translateY(-50%);
+      width: 18px; height: 18px;
+      stroke: var(--text-2); cursor: pointer;
+      transition: stroke 0.3s; z-index: 10;
+    }
+    .password-toggle:active { transform: translateY(-50%) scale(0.9); }
+
+    input {
+      width: 100%;
+      padding: 15px 16px 15px 46px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      color: var(--text-1);
+      font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+      outline: none;
+      transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
+    }
+    input.no-right-icon { padding-right: 16px; }
+    input.has-toggle    { padding-right: 46px; }
+    input:focus {
+      border-color: var(--accent-border);
+      background: rgba(255,255,255,0.08);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+    input::placeholder { color: var(--text-3); }
+    body.light input { background: rgba(0,0,0,0.04); color: #111; }
+    body.light input::placeholder { color: rgba(17,17,17,0.3); }
+
+    .error {
+      color: var(--danger); font-size: 0.75rem;
+      margin-top: 8px; padding-left: 16px;
+      font-weight: 600; display: none;
+    }
+    .error.show { display: block; }
+
+    .submit-btn {
+      width: 100%; padding: 16px;
+      background: var(--accent); border: none;
+      border-radius: 100px;
+      color: #090909; font-weight: 700;
+      font-size: 0.95rem; font-family: 'DM Sans', sans-serif;
+      cursor: pointer; margin-top: 8px;
+      box-shadow: 0 4px 20px rgba(232,255,90,0.25);
+      transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+      position: relative; overflow: hidden;
+    }
+    .submit-btn::before {
+      content: '';
+      position: absolute; top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      transition: left 0.5s;
+    }
+    .submit-btn:hover::before { left: 100%; }
+    .submit-btn:active { transform: scale(0.97); opacity: 0.9; }
+    body.light .submit-btn { background: var(--accent); color: #090909; }
+
+    /* ── Info section ── */
+    .info-section {
+      margin-top: 28px; padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+    .info-text {
+      text-align: center; color: var(--text-2);
+      font-size: 0.8rem; line-height: 1.6; margin-bottom: 16px;
+    }
+
+    .account-info {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md); padding: 18px;
+      display: none;
+    }
+    .account-info.show { display: block; }
+    .account-label {
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 2px; color: var(--text-3); margin-bottom: 8px;
+    }
+    .saved-email {
+      color: var(--accent);
+      font-weight: 600; font-size: 0.88rem;
+      margin-bottom: 14px; word-break: break-all;
+      font-family: 'DM Mono', monospace;
+    }
+    body.light .saved-email { color: var(--accent); }
+    .clear-btn {
+      width: 100%; padding: 11px;
+      background: var(--danger-dim);
+      border: 1px solid rgba(255,90,90,0.25);
+      border-radius: 100px;
+      color: var(--danger); font-weight: 600;
+      font-size: 0.8rem; cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .clear-btn:active { transform: scale(0.97); }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(8px);
+      display: none; align-items: center; justify-content: center;
+      z-index: 1000; padding: 24px;
+    }
+    .modal-overlay.active { display: flex; }
+
+    .modal-content {
+      background: var(--surface-0);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-2xl);
+      padding: 32px; max-width: 380px; width: 100%;
+      transform: scale(0.92); opacity: 0;
+      transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .modal-overlay.active .modal-content { transform: scale(1); opacity: 1; }
+    body.light .modal-content { background: var(--surface-1); }
+
+    .modal-icon {
+      width: 52px; height: 52px;
+      margin: 0 auto 18px;
+      border-radius: var(--r-md);
+      background: var(--accent-dim);
+      border: 1px solid var(--accent-border);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-icon svg { width: 24px; height: 24px; stroke: var(--accent); stroke-width: 2; }
+    body.light .modal-icon svg { stroke: var(--accent); }
+    .modal-title {
+      font-size: 1.1rem; font-weight: 700; text-align: center;
+      margin-bottom: 10px; color: var(--text-1); letter-spacing: -0.3px;
+    }
+    .modal-message {
+      color: var(--text-2); line-height: 1.6;
+      margin-bottom: 24px; text-align: center; font-size: 0.84rem;
+    }
+    .modal-email { color: var(--accent); font-weight: 600; word-break: break-all; font-family: 'DM Mono', monospace; }
+    .modal-buttons { display: flex; gap: 8px; }
+    .modal-btn {
+      flex: 1; padding: 13px; border: none;
+      border-radius: 100px; font-weight: 600;
+      font-size: 0.875rem; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+    }
+    .modal-btn:active { transform: scale(0.97); }
+    .modal-btn-primary {
+      background: var(--accent); color: #090909;
+    }
+    body.light .modal-btn-primary { background: var(--accent); color: #090909; }
+    .modal-btn-secondary {
+      background: var(--surface-2);
+      color: var(--text-1);
+      border: 1px solid var(--border);
+    }
+
+    @media (max-width: 400px) {
+      .login-card { padding: 24px 20px; }
+      .modal-buttons { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+
+    <!-- Top Bar (dashboard style) -->
+    <div class="topbar">
+      <div class="brand">AADAconnect<span></span></div>
+    </div>
+
+    <!-- Brand Hero -->
+    <div class="brand-hero">
+      <div class="brand-logo-icon">
+        <img src="AADA_logo.png" alt="AADA Logo" onerror="this.style.display='none';this.parentElement.innerHTML='<i class=\'fa-solid fa-plug-circle-bolt\'></i>'">
+      </div>
+      <div class="brand-name">AADAconnect</div>
+      <div class="brand-sub">Smart Home Control</div>
+    </div>
+
+    <!-- Login Card — original design preserved -->
+    <div class="login-card">
+      <form id="loginForm" onsubmit="handleLogin(event)">
+
+        <div class="form-group">
+          <label class="field-label" for="email">Email Address</label>
+          <div class="input-wrapper">
+            <input type="email" id="email" class="no-right-icon" placeholder="your@email.com" required>
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+          </div>
+          <div class="error" id="emailError">Please enter a valid email address</div>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label" for="password">Password</label>
+          <div class="input-wrapper">
+            <input type="password" id="password" class="has-toggle" placeholder="Enter your password" required>
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <svg class="password-toggle" id="togglePassword" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <div class="error" id="passwordError">Please enter a password</div>
+        </div>
+
+        <div class="error" id="loginError"></div>
+
+        <button type="submit" class="submit-btn">Continue</button>
+      </form>
+
+      <div class="info-section">
+        <p class="info-text">First time? We'll create an account for you automatically</p>
+        <div class="account-info" id="accountInfo">
+          <div class="account-label">Currently saved account</div>
+          <div class="saved-email" id="savedEmail"></div>
+          <button class="clear-btn" onclick="clearAccount()">Clear Saved Account</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Switch Account Modal -->
+  <div class="modal-overlay" id="switchModal">
+    <div class="modal-content">
+      <div class="modal-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="8.5" cy="7" r="4"/>
+          <polyline points="17 11 19 13 23 9"/>
+        </svg>
+      </div>
+      <h2 class="modal-title">Switch Account?</h2>
+      <p class="modal-message">
+        An account (<span class="modal-email" id="existingEmail"></span>) is already saved.
+        Do you want to switch to the new account?
+      </p>
+      <div class="modal-buttons">
+        <button class="modal-btn modal-btn-secondary" onclick="cancelSwitch()">Cancel</button>
+        <button class="modal-btn modal-btn-primary" onclick="confirmSwitch()">Switch</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <script>
+    let pendingAccount = null;
+
+    function initTheme() {
+      // Apply dashboard theme (light/dark)
+      const isLight = localStorage.getItem('lightMode') === 'true';
+      if (isLight) document.body.classList.add('light');
+    }
+
+    document.getElementById('togglePassword').addEventListener('click', function() {
+      const input = document.getElementById('password');
+      const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+      input.setAttribute('type', type);
+      this.innerHTML = type === 'text'
+        ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+        : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    });
+
+    function hashValue(value) {
+      return CryptoJS.SHA256(value).toString(CryptoJS.enc.Hex);
+    }
+
+    function handleLogin(event) {
+      event.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const emailError = document.getElementById('emailError');
+      const passwordError = document.getElementById('passwordError');
+      const loginError = document.getElementById('loginError');
+      emailError.classList.remove('show');
+      passwordError.classList.remove('show');
+      loginError.classList.remove('show');
+      if (!email || !password) {
+        if (!email) emailError.classList.add('show');
+        if (!password) passwordError.classList.add('show');
+        return;
+      }
+      const hashedEmail = hashValue(email);
+      const hashedPassword = hashValue(password);
+      const accountKey = hashedEmail + '|' + hashedPassword;
+      const existingAccount = localStorage.getItem('aada_account');
+      const existingEmail = localStorage.getItem('aada_email');
+      if (!existingAccount) {
+        saveAccount(email, password, hashedEmail, hashedPassword);
+        loginUser(email, password, hashedEmail, hashedPassword);
+        alert('Account created successfully!');
+        window.location.href = 'dashboard.html';
+      } else if (existingAccount === accountKey) {
+        loginUser(email, password, hashedEmail, hashedPassword);
+        window.location.href = 'dashboard.html';
+      } else {
+        pendingAccount = { email, password, hashedEmail, hashedPassword };
+        document.getElementById('existingEmail').textContent = existingEmail;
+        document.getElementById('switchModal').classList.add('active');
+      }
+    }
+
+    function saveAccount(email, password, hashedEmail, hashedPassword) {
+      const accountKey = hashedEmail + '|' + hashedPassword;
+      localStorage.setItem('aada_account', accountKey);
+      localStorage.setItem('aada_email', email);
+      localStorage.setItem('aada_password', password);
+      localStorage.setItem('aada_hashed_email', hashedEmail);
+      localStorage.setItem('aada_hashed_password', hashedPassword);
+    }
+
+    function loginUser(email, password, hashedEmail, hashedPassword) {
+      sessionStorage.setItem('current_user', JSON.stringify({ email, password, hashed_email: hashedEmail, hashed_password: hashedPassword }));
+    }
+
+    function clearAllAccountData() {
+      ['aada_account','aada_email','aada_password','aada_hashed_email','aada_hashed_password'].forEach(k => localStorage.removeItem(k));
+      sessionStorage.clear();
+    }
+
+    function confirmSwitch() {
+      if (!pendingAccount) return;
+      clearAllAccountData();
+      saveAccount(pendingAccount.email, pendingAccount.password, pendingAccount.hashedEmail, pendingAccount.hashedPassword);
+      loginUser(pendingAccount.email, pendingAccount.password, pendingAccount.hashedEmail, pendingAccount.hashedPassword);
+      document.getElementById('switchModal').classList.remove('active');
+      pendingAccount = null;
+      alert('Account switched successfully!');
+      window.location.href = 'dashboard.html';
+    }
+
+    function cancelSwitch() {
+      document.getElementById('switchModal').classList.remove('active');
+      pendingAccount = null;
+      const loginError = document.getElementById('loginError');
+      loginError.textContent = 'Please use the saved account or clear it to create a new one';
+      loginError.classList.add('show');
+    }
+
+    function clearAccount() {
+      const savedEmail = localStorage.getItem('aada_email');
+      if (!savedEmail) { alert('No account saved to clear'); return; }
+      if (confirm(`Are you sure you want to clear the saved account (${savedEmail})? This will log you out.`)) {
+        clearAllAccountData(); location.reload();
+      }
+    }
+
+    function showAccountInfo() {
+      const savedEmail = localStorage.getItem('aada_email');
+      if (savedEmail) {
+        document.getElementById('savedEmail').textContent = savedEmail;
+        document.getElementById('accountInfo').classList.add('show');
+      }
+    }
+
+    window.onload = function() {
+      initTheme();
+      const currentUser = sessionStorage.getItem('current_user');
+      if (currentUser) { window.location.href = 'dashboard.html'; return; }
+      const remembered = localStorage.getItem('remembered_user');
+      if (remembered && localStorage.getItem('rememberMe') === 'true') {
+        try { sessionStorage.setItem('current_user', remembered); window.location.href = 'dashboard.html'; return; } catch(e) {}
+      }
+      showAccountInfo();
+    };
+  </script>
+</body>
+</html>
