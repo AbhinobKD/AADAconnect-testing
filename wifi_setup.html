@@ -67,21 +67,21 @@
       --shadow-md: 0 16px 40px rgba(0,0,0,0.5);
     }
 
-    html, body { height: 100%; font-family: 'Inter', sans-serif; color: var(--text-primary); }
+    html, body { font-family: 'Inter', sans-serif; color: var(--text-primary); }
     body {
       background: var(--bg);
-      display: flex; justify-content: center;
       transition: background 0.3s ease;
       min-height: 100vh;
       overflow-x: hidden;
-      overflow-y: auto; /* ensure body scrolls */
+      overflow-y: auto;
     }
 
     /* ── App Shell ── */
     .app {
       width: 100%; max-width: 430px;
       min-height: 100vh;
-      padding: 0 0 120px;
+      padding: 0 0 160px;
+      margin: 0 auto;
       position: relative;
       background: var(--bg);
     }
