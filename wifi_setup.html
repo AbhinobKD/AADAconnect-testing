@@ -82,7 +82,7 @@
       width: 100%; max-width: 430px;
       min-height: 100vh;
       /* enough bottom padding to clear the nav + safe area */
-      padding-bottom: calc(72px + 16px + env(safe-area-inset-bottom, 0px) + 80px);
+      padding-bottom: calc(72px + 16px + env(safe-area-inset-bottom, 0px) + 160px);
       position: relative;
       background: var(--bg);
     }
@@ -125,6 +125,7 @@
 
     /* ── Device Tile ── */
     .content { padding: 0 24px; }
+    .content:last-of-type { margin-bottom: 40px; }
 
     .device-tile {
       background: var(--surface); border: 1px solid var(--border);
