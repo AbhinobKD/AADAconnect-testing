@@ -81,8 +81,7 @@
     .app {
       width: 100%; max-width: 430px;
       min-height: 100vh;
-      /* enough bottom padding to clear the nav + safe area */
-      padding-bottom: calc(72px + 16px + env(safe-area-inset-bottom, 0px) + 160px);
+      padding: 0 0 120px;
       position: relative;
       background: var(--bg);
     }
@@ -125,7 +124,6 @@
 
     /* ── Device Tile ── */
     .content { padding: 0 24px; }
-    .content:last-of-type { margin-bottom: 40px; }
 
     .device-tile {
       background: var(--surface); border: 1px solid var(--border);
@@ -264,17 +262,25 @@
     .status-msg.success { display:block; background:var(--online-dim); border:1px solid rgba(48,209,88,0.3); color:var(--online); }
     .status-msg.error   { display:block; background:var(--danger-dim); border:1px solid rgba(255,69,58,0.25); color:var(--danger); }
 
-    /* ── Floating Glass Bottom Nav ── */
-    .bottom-nav {
+    /* ── Nav Dock ── */
+    .bottom-nav-wrap {
       position: fixed;
-      bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-      left: 50%; transform: translateX(-50%);
-      width: calc(min(100vw, 430px) - 48px);
-      height: 72px;
+      bottom: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      padding: 12px 20px 28px;
+      background: linear-gradient(to top, var(--bg) 60%, transparent);
+      z-index: 100;
+      pointer-events: none;
+    }
+    .bottom-nav {
+      display: flex; justify-content: space-around; align-items: center;
       background: var(--nav-bg); backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
       border: 1px solid var(--border); border-radius: var(--radius-xl);
-      display: flex; justify-content: space-around; align-items: center;
-      padding: 0 8px; z-index: 20; box-shadow: var(--shadow-md);
+      padding: 0 8px; height: 72px;
+      box-shadow: var(--shadow-md);
+      pointer-events: all;
     }
     .nav-item {
       display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -415,6 +421,7 @@
 </div>
 
 <!-- Bottom Nav -->
+<div class="bottom-nav-wrap">
 <nav class="bottom-nav">
   <div class="nav-item active clickable" onclick="goHome()">
     <div class="nav-icon">
@@ -447,6 +454,7 @@
     <span>More</span>
   </div>
 </nav>
+</div>
 
 <script>
   let provisioningData = null;
