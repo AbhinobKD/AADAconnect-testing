@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AADAconnect</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+
+    /* ── Design Tokens (exact match to login/dashboard) ── */
+    :root {
+      --radius-xl: 32px;
+      --radius-lg: 28px;
+      --radius-md: 20px;
+      --radius-sm: 12px;
+      --transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    [data-theme="light"] {
+      --bg: #F2F2F7;
+      --surface: #FFFFFF;
+      --surface-secondary: #EBEBF0;
+      --text-primary: #000000;
+      --text-secondary: #8E8E93;
+      --border: rgba(0,0,0,0.07);
+      --border-strong: rgba(0,0,0,0.12);
+      --active-light: #FF9500;
+      --active-blue: #0A84FF;
+      --online: #34C759;
+      --card-bg: #FFFFFF;
+      --card-border: rgba(0,0,0,0.08);
+      --node-color: rgba(0,0,0,0.04);
+      --node-border: rgba(0,0,0,0.07);
+      --dot-color: rgba(0,0,0,0.08);
+      --line-color: rgba(0,0,0,0.04);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0A0A0A;
+      --surface: #1C1C1E;
+      --surface-secondary: #2C2C2E;
+      --text-primary: #FFFFFF;
+      --text-secondary: #8E8E93;
+      --border: rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.14);
+      --active-light: #FF9F0A;
+      --active-blue: #0A84FF;
+      --online: #30D158;
+      --card-bg: #111112;
+      --card-border: rgba(255,255,255,0.09);
+      --node-color: rgba(255,255,255,0.025);
+      --node-border: rgba(255,255,255,0.07);
+      --dot-color: rgba(255,255,255,0.07);
+      --line-color: rgba(255,255,255,0.035);
+    }
+
+    html, body { height: 100%; font-family: 'Inter', sans-serif; color: var(--text-primary); }
+    body {
+      background: var(--bg);
+      display: flex; justify-content: center;
+      min-height: 100vh; overflow-x: hidden;
+      transition: background 0.3s ease;
+    }
+
+    /* ── Page shell ── */
+    .container {
+      position: relative; width: 100%; max-width: 430px;
+      min-height: 100vh;
+      display: flex; flex-direction: column; justify-content: flex-end;
+    }
+
+    /* ─────────────────────────────
+       BACKGROUND — dot grid + lines
+    ───────────────────────────── */
+    .hero-bg {
+      position: fixed; inset: 0;
+      z-index: 0; pointer-events: none;
+    }
+    .hero-bg::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
+      background-size: 26px 26px;
+    }
+    .hero-bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent, transparent 51px,
+        var(--line-color) 51px, var(--line-color) 52px
+      );
+    }
+
+    /* ─────────────────────────────
+       FLOATING NODE CARDS
+    ───────────────────────────── */
+    .node-card {
+      position: fixed;
+      background: var(--node-color);
+      border: 1px solid var(--node-border);
+      border-radius: 14px;
+      padding: 11px 14px;
+      display: flex; align-items: center; gap: 9px;
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      animation: nodeDrift linear infinite;
+      white-space: nowrap;
+      z-index: 1; pointer-events: none;
+    }
+    .node-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .node-dot.on  { background: #30D158; }
+    .node-dot.off { background: var(--border-strong); }
+    .node-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.1px; }
+    .node-status { font-size: 11px; font-weight: 700; margin-left: auto; padding-left: 10px; }
+    .node-status.on  { color: #30D158; }
+    .node-status.off { color: var(--text-secondary); }
+    [data-theme="light"] .node-dot.on   { background: #28A745; }
+    [data-theme="light"] .node-status.on { color: #28A745; }
+
+    @keyframes nodeDrift {
+      0%   { transform: translateY(0);      opacity: 0; }
+      8%   { opacity: 1; }
+      88%  { opacity: 1; }
+      100% { transform: translateY(-115vh); opacity: 0; }
+    }
+
+    .node-1 { left: 18px;  top: 105vh; animation-duration: 14s; animation-delay: 0s;   }
+    .node-2 { left: 44%;   top: 108vh; animation-duration: 18s; animation-delay: -5s;  }
+    .node-3 { right: 18px; top: 106vh; animation-duration: 12s; animation-delay: -3s;  }
+    .node-4 { left: 18px;  top: 110vh; animation-duration: 16s; animation-delay: -9s;  }
+    .node-5 { right: 18px; top: 107vh; animation-duration: 13s; animation-delay: -7s;  }
+    .node-6 { left: 38%;   top: 109vh; animation-duration: 19s; animation-delay: -12s; }
+
+    /* ── Blur mask — progressively blurs nodes near brand text ── */
+    .hero-fade {
+      position: fixed; inset: 0;
+      z-index: 2; pointer-events: none;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      -webkit-mask-image: linear-gradient(to bottom, black 0%, black 30%, transparent 58%);
+      mask-image: linear-gradient(to bottom, black 0%, black 30%, transparent 58%);
+      background: transparent;
+    }
+    .hero-fade::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(to bottom, var(--bg) 0%, rgba(0,0,0,0) 52%);
+      opacity: 0.5;
+    }
+    [data-theme="light"] .hero-fade::after {
+      background: linear-gradient(to bottom, var(--bg) 0%, rgba(242,242,247,0) 52%);
+    }
+
+    /* ─────────────────────────────
+       BRAND BLOCK (upper zone)
+    ───────────────────────────── */
+    .brand-block {
+      position: relative; z-index: 10;
+      flex: 1;
+      display: flex; flex-direction: column; justify-content: center;
+      padding: 60px 28px 20px;
+      min-height: 0;
+    }
+
+    /* Logo mark */
+    .logo-wrap {
+      width: 64px; height: 64px;
+      border-radius: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 28px;
+      overflow: hidden;
+    }
+    .logo-wrap img { width: 100%; height: 100%; object-fit: contain; }
+    .logo-wrap i { font-size: 1.6rem; color: var(--active-light); }
+
+    /* Headline */
+    .brand-headline {
+      font-size: 38px; font-weight: 700;
+      letter-spacing: -1.4px; line-height: 1.05;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+    .brand-headline em {
+      font-style: italic; font-weight: 300;
+      color: var(--text-secondary);
+    }
+
+    .brand-desc {
+      font-size: 14px; font-weight: 400;
+      color: var(--text-secondary); line-height: 1.65;
+      max-width: 260px;
+      margin-bottom: 32px;
+    }
+
+    /* Feature rows */
+    .feature-list {
+      display: flex; flex-direction: column; gap: 12px;
+      margin-bottom: 0;
+    }
+    .feature-item {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .feature-icon {
+      width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+      background: var(--surface-secondary);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: var(--text-secondary);
+    }
+    .feature-icon.accent { color: var(--active-light); }
+    .feature-icon.blue   { color: var(--active-blue); }
+    .feature-icon.green  { color: var(--online); }
+    .feature-text {
+      font-size: 13px; font-weight: 500;
+      color: var(--text-secondary); line-height: 1.4;
+    }
+    .feature-text strong { color: var(--text-primary); font-weight: 600; }
+
+    /* ─────────────────────────────
+       BOTTOM CARD
+    ───────────────────────────── */
+    .bottom-card {
+      position: relative; z-index: 10;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-bottom: none;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      padding: 20px 24px max(env(safe-area-inset-bottom, 0px), 32px);
+      flex-shrink: 0;
+      animation: slideUp 0.52s cubic-bezier(0.32, 0.72, 0, 1) both;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(110%); }
+      to   { transform: translateY(0); }
+    }
+
+    .card-handle {
+      width: 36px; height: 4px;
+      background: var(--border-strong);
+      border-radius: 2px; margin: 0 auto 20px;
+    }
+
+    /* App name row inside card */
+    .card-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .card-app-name {
+      font-size: 17px; font-weight: 700; letter-spacing: -0.4px;
+      color: var(--text-primary);
+    }
+    .card-app-sub {
+      font-size: 12px; color: var(--text-secondary); font-weight: 500;
+      margin-top: 2px;
+    }
+    .card-version {
+      font-size: 11px; font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--surface-secondary);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 4px 10px;
+    }
+
+    /* Continue button */
+    .continue-btn {
+      width: 100%; padding: 16px;
+      background: var(--text-primary);
+      border: none; border-radius: var(--radius-md);
+      color: var(--card-bg);
+      font-weight: 700; font-size: 15px; font-family: 'Inter', sans-serif;
+      cursor: pointer; letter-spacing: -0.2px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: var(--transition);
+    }
+    .continue-btn:active { transform: scale(0.98); opacity: 0.8; }
+    .continue-btn i { font-size: 13px; }
+
+    /* Footer note */
+    .card-note {
+      text-align: center; margin-top: 14px;
+      font-size: 11px; color: var(--text-secondary);
+      font-weight: 500; line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Background layers -->
+  <div class="hero-bg"></div>
+  <div class="hero-fade"></div>
+
+  <!-- Floating node cards -->
+  <div class="node-card node-1">
+    <div class="node-dot on"></div>
+    <div class="node-label">Living Room Plug</div>
+    <div class="node-status on">On</div>
+  </div>
+  <div class="node-card node-2">
+    <div class="node-dot off"></div>
+    <div class="node-label">Bedroom Lamp</div>
+    <div class="node-status off">Off</div>
+  </div>
+  <div class="node-card node-3">
+    <div class="node-dot on"></div>
+    <div class="node-label">Office Plug</div>
+    <div class="node-status on">On</div>
+  </div>
+  <div class="node-card node-4">
+    <div class="node-dot on"></div>
+    <div class="node-label">Kitchen Socket</div>
+    <div class="node-status on">On</div>
+  </div>
+  <div class="node-card node-5">
+    <div class="node-dot off"></div>
+    <div class="node-label">Study Plug</div>
+    <div class="node-status off">Off</div>
+  </div>
+  <div class="node-card node-6">
+    <div class="node-dot on"></div>
+    <div class="node-label">Hall Plug</div>
+    <div class="node-status on">On</div>
+  </div>
+
+  <!-- Brand block -->
+  <div class="brand-block">
+
+    <div class="logo-wrap">
+      <img src="AADA_logo.png" alt="AADA"
+        onerror="this.style.display='none';this.parentElement.innerHTML='<i class=\'fa-solid fa-plug-circle-bolt\'></i>'">
+    </div>
+
+    <div class="brand-headline">Your home,<br><em>always</em><br>connected.</div>
+    <div class="brand-desc">Monitor, control, and automate every smart plug in your home — from anywhere.</div>
+
+    <div class="feature-list">
+      <div class="feature-item">
+        <div class="feature-icon accent"><i class="fa-solid fa-bolt"></i></div>
+        <div class="feature-text"><strong>Real-time control</strong> over all your smart plugs</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon blue"><i class="fa-solid fa-wifi"></i></div>
+        <div class="feature-text"><strong>MQTT sync</strong> — instant updates, zero delay</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon green"><i class="fa-solid fa-chart-simple"></i></div>
+        <div class="feature-text"><strong>Energy insights</strong> across all connected devices</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom card -->
+  <div class="bottom-card">
+    <div class="card-handle"></div>
+
+    <div class="card-top">
+      <div>
+        <div class="card-app-name">AADAconnect</div>
+        <div class="card-app-sub">Smart Home Platform</div>
+      </div>
+      <div class="card-version">v1.0</div>
+    </div>
+
+    <button class="continue-btn" onclick="handleContinue()">
+      Continue <i class="fa-solid fa-arrow-right"></i>
+    </button>
+
+    <div class="card-note">By continuing you agree to the AADAconnect terms of use</div>
+  </div>
+
+</div>
+
+<script>
+  function initTheme() {
+    const saved = localStorage.getItem('appTheme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  }
+
+  function handleContinue() {
+    // Check if a session is already active
+    const sessionUser = sessionStorage.getItem('current_user');
+    if (sessionUser) {
+      window.location.href = 'dashboard.html';
+      return;
+    }
+
+    // Check if remember me is set with saved user
+    const remembered = localStorage.getItem('remembered_user');
+    const rememberMe  = localStorage.getItem('rememberMe');
+    if (remembered && rememberMe === 'true') {
+      try {
+        sessionStorage.setItem('current_user', remembered);
+        window.location.href = 'dashboard.html';
+        return;
+      } catch(e) {}
+    }
+
+    // Check if an account exists (even without remember me, prompt login)
+    const hasAccount = localStorage.getItem('aada_account');
+    if (hasAccount) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    // No account at all — go to login to create one
+    window.location.href = 'login.html';
+  }
+
+  window.onload = function() {
+    initTheme();
+  };
+</script>
+
+</body>
+</html>
