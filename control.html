@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AADA - Device Control</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --radius-xl: 32px; --radius-lg: 28px; --radius-md: 20px; --radius-sm: 12px;
+      --transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    [data-theme="light"] {
+      --bg: #F2F2F7; --surface: #FFFFFF; --surface-secondary: #F0F0F5;
+      --surface-sheet: #FFFFFF; --surface-item: #F8F8FC;
+      --text-primary: #000000; --text-secondary: #8E8E93; --text-tertiary: rgba(0,0,0,0.28);
+      --border: rgba(0,0,0,0.06); --border-strong: rgba(0,0,0,0.1);
+      --active-blue: #0A84FF; --online: #34C759; --online-dim: rgba(52,199,89,0.12);
+      --offline: rgba(0,0,0,0.2); --danger: #FF3B30; --danger-dim: rgba(255,59,48,0.1);
+      --shadow-sm: 0 4px 12px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+      --shadow-md: 0 12px 32px rgba(0,0,0,0.08);
+      --power-on-color: #34C759; --power-on-dim: rgba(52,199,89,0.15);
+      --power-off-color: #FF3B30; --power-off-dim: rgba(255,59,48,0.12);
+      --power-pending-color: #FF9500; --power-offline-color: #8E8E93;
+    }
+    [data-theme="dark"] {
+      --bg: #000000; --surface: #1C1C1E; --surface-secondary: #2C2C2E;
+      --surface-sheet: #1C1C1E; --surface-item: #2C2C2E;
+      --text-primary: #FFFFFF; --text-secondary: #8E8E93; --text-tertiary: rgba(255,255,255,0.28);
+      --border: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.14);
+      --active-blue: #0A84FF; --online: #30D158; --online-dim: rgba(48,209,88,0.12);
+      --offline: rgba(255,255,255,0.2); --danger: #FF453A; --danger-dim: rgba(255,69,58,0.12);
+      --shadow-sm: 0 4px 14px rgba(0,0,0,0.3); --shadow-md: 0 16px 40px rgba(0,0,0,0.5);
+      --power-on-color: #30D158; --power-on-dim: rgba(48,209,88,0.15);
+      --power-off-color: #FF453A; --power-off-dim: rgba(255,69,58,0.12);
+      --power-pending-color: #FF9F0A; --power-offline-color: #636366;
+    }
+
+    html, body { height: 100%; font-family: 'Inter', sans-serif; color: var(--text-primary); }
+    body { background: var(--bg); display: flex; justify-content: center; overflow: hidden; transition: background 0.3s ease; }
+
+    .phone {
+      width: 100%; max-width: 430px; height: 100vh;
+      display: flex; flex-direction: column; position: relative;
+      background: var(--bg); overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      flex-shrink: 0; z-index: 50;
+      padding: calc(env(safe-area-inset-top, 12px) + 12px) 20px 12px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+    .icon-btn {
+      width: 44px; height: 44px; border-radius: 50%; background: var(--surface-secondary);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: var(--shadow-sm); cursor: pointer; border: 1px solid var(--border);
+      transition: var(--transition); color: var(--text-primary); font-size: 17px;
+    }
+    .icon-btn:active { transform: scale(0.92); }
+    .back-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px 10px 12px; height: 44px; border-radius: 22px;
+      background: var(--surface-secondary); border: 1px solid var(--border);
+      color: var(--text-primary); font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: var(--transition);
+    }
+    .back-btn:active { transform: scale(0.95); }
+    .header-right { display: flex; gap: 10px; align-items: center; }
+
+    /* ── Stage — fills remaining height, stacks device card + power button ── */
+    .stage {
+      flex: 1; position: relative; display: flex;
+      flex-direction: column; align-items: center;
+      justify-content: center; overflow: hidden;
+    }
+
+    /* ── Device Info Card ── */
+    .device-card-header {
+      width: calc(100% - 40px); flex-shrink: 0;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 18px 20px;
+      box-shadow: var(--shadow-sm); margin-bottom: 24px;
+    }
+    .device-meta-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; margin-bottom: 14px; }
+    .device-icon-wrap {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--surface-secondary); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; color: var(--text-secondary); flex-shrink: 0; transition: var(--transition);
+    }
+    .device-name-wrap { flex: 1; min-width: 0; }
+    .device-label-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-secondary); margin-bottom: 3px; }
+    .device-name-text { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .device-actions-row { display: flex; gap: 8px; margin-bottom: 14px; }
+    .device-action-btn {
+      padding: 8px 14px; border-radius: 20px;
+      background: var(--surface-secondary); border: 1px solid var(--border);
+      color: var(--text-secondary); font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: var(--transition); display: flex; align-items: center; gap: 6px;
+    }
+    .device-action-btn:active { transform: scale(0.95); }
+    .device-action-btn.primary { background: rgba(10,132,255,0.12); border-color: rgba(10,132,255,0.3); color: var(--active-blue); }
+    .conn-row { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--border); }
+    .conn-left { display: flex; align-items: center; gap: 8px; }
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--offline); transition: background 0.3s; flex-shrink: 0; }
+    .conn-dot.connected { background: var(--online); box-shadow: 0 0 6px var(--online); animation: connPulse 2s ease-in-out infinite; }
+    @keyframes connPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.7;transform:scale(1.2)} }
+    .conn-text { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+    .conn-subtext { font-size: 11px; color: var(--text-secondary); }
+    .room-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 100px;
+      background: var(--surface-secondary); border: 1px solid var(--border);
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
+      cursor: pointer; transition: var(--transition);
+    }
+    .room-badge:active { transform: scale(0.95); }
+    .room-badge.has-room { background: rgba(10,132,255,0.1); border-color: rgba(10,132,255,0.25); color: var(--active-blue); }
+
+    /* ── Power Button ── */
+    .power-btn-wrap { position: relative; width: min(220px, 58vw); aspect-ratio: 1; flex-shrink: 0; }
+    .power-ring-outer {
+      position: absolute; inset: -16px; border-radius: 50%;
+      border: 2px solid transparent; border-top-color: var(--active-blue);
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .power-ring-outer.rotating { opacity: 1; animation: spin 1.2s linear infinite; }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+    .power-display {
+      width: 100%; height: 100%; background: var(--surface); border: 2px solid var(--border-strong);
+      border-radius: 50%; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 8px; cursor: pointer; user-select: none;
+      position: relative; overflow: hidden;
+      transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); box-shadow: var(--shadow-md);
+    }
+    .power-display::after {
+      content: ''; position: absolute; inset: 0; border-radius: 50%;
+      background: radial-gradient(circle at center, transparent 30%, rgba(255,255,255,0.02) 100%);
+      pointer-events: none;
+    }
+    .power-display:active { transform: scale(0.96); }
+    .power-display.power-on { border-color: var(--power-on-color); box-shadow: var(--shadow-md), 0 0 40px var(--power-on-dim), inset 0 0 30px var(--power-on-dim); }
+    .power-display.power-off { border-color: var(--power-off-color); box-shadow: var(--shadow-md), 0 0 30px var(--power-off-dim), inset 0 0 20px var(--power-off-dim); }
+    .power-display.power-pending { border-color: var(--power-pending-color); }
+    .power-display.power-offline { border-color: var(--power-offline-color); opacity: 0.75; }
+    .power-display.success-anim { animation: successPulse 0.45s ease-out; }
+    @keyframes successPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+    .power-ico { font-size: 40px; transition: all 0.4s cubic-bezier(0.25,1,0.5,1); color: var(--text-tertiary); }
+    .power-display.power-on .power-ico { color: var(--power-on-color); filter: drop-shadow(0 0 12px var(--power-on-color)); transform: scale(1.08); }
+    .power-display.power-off .power-ico { color: var(--power-off-color); filter: drop-shadow(0 0 8px var(--power-off-color)); }
+    .power-display.power-pending .power-ico { color: var(--power-pending-color); }
+    .power-display.power-offline .power-ico { color: var(--power-offline-color); }
+    .power-status-label { font-size: 20px; font-weight: 700; letter-spacing: 1px; transition: all 0.3s ease; color: var(--text-tertiary); }
+    .power-display.power-on .power-status-label { color: var(--power-on-color); text-shadow: 0 0 16px var(--power-on-dim); }
+    .power-display.power-off .power-status-label { color: var(--power-off-color); }
+    .power-display.power-pending .power-status-label { color: var(--power-pending-color); }
+    .power-display.power-offline .power-status-label { color: var(--power-offline-color); }
+
+    /* ═══════════════════════════════════════
+       DRAGGABLE INFO PANEL (bottom of stage)
+    ═══════════════════════════════════════ */
+    .info-panel {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: var(--surface-sheet);
+      border-top: 1px solid var(--border);
+      border-radius: 22px 22px 0 0;
+      box-shadow: 0 -6px 28px rgba(0,0,0,0.18);
+      display: flex; flex-direction: column;
+      z-index: 30;
+      /* height controlled by JS; no CSS transition during drag */
+      will-change: height;
+    }
+
+    /* ── Handle zone ── */
+    .panel-handle-zone {
+      flex-shrink: 0; padding: 10px 0 6px;
+      cursor: ns-resize; touch-action: none;
+      display: flex; flex-direction: column; align-items: center;
+      user-select: none; -webkit-user-select: none;
+    }
+    .panel-handle {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: var(--border-strong);
+      transition: width 0.18s ease, background 0.18s ease;
+    }
+    .panel-handle-zone:hover .panel-handle,
+    .panel-handle-zone.is-dragging .panel-handle {
+      width: 52px; background: var(--text-tertiary);
+    }
+
+    /* ── Status message strip — always visible ── */
+    .panel-status {
+      flex-shrink: 0; margin: 6px 16px 0;
+      padding: 12px 16px; border-radius: var(--radius-md);
+      background: var(--surface-secondary); border: 1px solid var(--border);
+      font-size: 14px; font-weight: 600; text-align: center;
+      transition: background 0.3s, border-color 0.3s, color 0.3s;
+    }
+    .panel-status.status-on    { color: var(--power-on-color);  border-color: rgba(48,209,88,0.3);   background: var(--power-on-dim); }
+    .panel-status.status-off   { color: var(--power-off-color); border-color: rgba(255,69,58,0.25);  background: var(--power-off-dim); }
+    .panel-status.status-pending { color: var(--power-pending-color); border-color: rgba(255,159,10,0.3); }
+    .panel-status.status-offline { color: var(--power-offline-color); }
+    .panel-status.status-checking { color: var(--text-secondary); }
+
+    /* ── Scrollable body below status ── */
+    .panel-scroll {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    }
+    .panel-scroll::-webkit-scrollbar { display: none; }
+
+    .panel-section-title {
+      padding: 18px 20px 10px;
+      font-size: 17px; font-weight: 700; letter-spacing: -0.3px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .panel-section-action { font-size: 14px; color: var(--active-blue); font-weight: 500; cursor: pointer; transition: opacity 0.2s; }
+    .panel-section-action:active { opacity: 0.6; }
+
+    .info-row {
+      margin: 0 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-sm);
+    }
+    .info-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 13px 16px; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background 0.15s;
+    }
+    .info-item:last-child { border-bottom: none; }
+    .info-item:active { background: var(--surface-secondary); }
+    .info-item-icon {
+      width: 36px; height: 36px; border-radius: var(--radius-sm);
+      background: var(--surface-secondary); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: var(--text-secondary); flex-shrink: 0;
+    }
+    .info-item-body { flex: 1; }
+    .info-item-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-secondary); margin-bottom: 2px; }
+    .info-item-value { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .info-item-chevron { color: var(--text-tertiary); font-size: 11px; flex-shrink: 0; }
+
+    /* ── Modal overlay & sheets ── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
+      z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    }
+    .overlay.show { opacity: 1; pointer-events: all; }
+
+    .sheet {
+      position: fixed; bottom: 0; left: 50%;
+      transform: translateX(-50%) translateY(105%);
+      width: 100%; max-width: 430px;
+      background: var(--surface-sheet); border: 1px solid var(--border); border-bottom: none;
+      border-radius: 24px 24px 0 0; padding: 0 0 40px;
+      z-index: 300; transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+      max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;
+    }
+    .sheet.show { transform: translateX(-50%) translateY(0); }
+    .sheet-handle-area { padding: 12px 20px 0; flex-shrink: 0; }
+    .sheet-handle { width: 36px; height: 4px; background: var(--surface-secondary); border-radius: 2px; margin: 0 auto 16px; }
+    .sheet-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .sheet-back {
+      width: 32px; height: 32px; border-radius: var(--radius-sm);
+      background: var(--surface-secondary); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--text-secondary); font-size: 12px; flex-shrink: 0; transition: all 0.15s;
+    }
+    .sheet-back:active { transform: scale(0.9); }
+    .sheet-title { font-size: 17px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.2px; }
+    .sheet-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 20px; flex: 1; scrollbar-width: none; }
+    .sheet-scroll::-webkit-scrollbar { display: none; }
+    .sheet-cat { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-tertiary); margin: 16px 0 8px; }
+    .sheet-cat:first-child { margin-top: 0; }
+
+    .sheet-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 13px 14px; background: var(--surface-item); border: 1px solid var(--border);
+      border-radius: var(--radius-md); margin-bottom: 8px; cursor: pointer; transition: all 0.15s;
+    }
+    .sheet-item:last-child { margin-bottom: 0; }
+    .sheet-item:active { transform: scale(0.98); background: var(--surface-secondary); }
+
+    .item-icon {
+      width: 38px; height: 38px; border-radius: var(--radius-sm);
+      background: var(--surface-secondary); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-secondary); font-size: 14px; flex-shrink: 0;
+    }
+    .item-body { flex: 1; min-width: 0; }
+    .item-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+    .item-sub { font-size: 12px; color: var(--text-secondary); }
+
+    .room-option {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; background: var(--surface-item); border: 1px solid var(--border);
+      border-radius: var(--radius-md); margin-bottom: 8px; cursor: pointer; transition: all 0.15s;
+    }
+    .room-option:last-child { margin-bottom: 0; }
+    .room-option:active { transform: scale(0.98); }
+    .room-option.selected { background: rgba(10,132,255,0.1); border-color: rgba(10,132,255,0.3); }
+    .room-option-icon { width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--surface-secondary); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .room-option.selected .room-option-icon { background: rgba(10,132,255,0.15); border-color: rgba(10,132,255,0.3); }
+    .room-option-name { flex: 1; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .room-option-count { font-size: 12px; color: var(--text-secondary); }
+    .room-option-check { color: var(--active-blue); font-size: 14px; display: none; }
+    .room-option.selected .room-option-check { display: block; }
+
+    .sheet-input-wrap { margin-bottom: 12px; }
+    .sheet-input-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-secondary); margin-bottom: 8px; }
+    .sheet-input {
+      width: 100%; padding: 12px 14px;
+      background: var(--surface-secondary); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text-primary);
+      font-size: 15px; font-family: inherit; outline: none; transition: border-color 0.2s;
+    }
+    .sheet-input:focus { border-color: var(--active-blue); }
+    .sheet-input::placeholder { color: var(--text-tertiary); }
+    .sheet-input-emoji-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .emoji-btn {
+      width: 40px; height: 40px; border-radius: var(--radius-sm);
+      background: var(--surface-secondary); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; cursor: pointer; transition: all 0.15s;
+    }
+    .emoji-btn:active { transform: scale(0.9); }
+    .emoji-btn.selected { background: rgba(10,132,255,0.15); border-color: rgba(10,132,255,0.4); }
+
+    .sheet-btn {
+      width: 100%; padding: 14px; border-radius: var(--radius-md); border: none;
+      font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; transition: all 0.2s; margin-top: 8px;
+    }
+    .sheet-btn.primary { background: var(--active-blue); color: #fff; }
+    .sheet-btn.primary:active { opacity: 0.85; transform: scale(0.98); }
+    .sheet-btn.secondary { background: var(--surface-secondary); color: var(--text-primary); border: 1px solid var(--border); }
+    .sheet-btn.secondary:active { transform: scale(0.98); }
+    .sheet-btn.danger { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(255,69,58,0.2); }
+    .sheet-btn.danger:active { transform: scale(0.98); }
+
+    .toast {
+      position: fixed; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+      left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--surface); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md); padding: 12px 20px;
+      font-size: 14px; font-weight: 600; color: var(--text-primary);
+      box-shadow: var(--shadow-md); z-index: 999;
+      opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.25,1,0.5,1); white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .empty-rooms { text-align: center; padding: 24px 20px; color: var(--text-secondary); font-size: 14px; font-weight: 500; }
+    .empty-rooms i { font-size: 26px; margin-bottom: 10px; display: block; color: var(--text-tertiary); }
+  </style>
+</head>
+<body>
+<div class="phone" id="phone">
+
+  <!-- Header -->
+  <header class="header">
+    <button class="back-btn" id="backButton">
+      <i class="fa-solid fa-chevron-left"></i> Back
+    </button>
+    <div class="header-right">
+      <div class="icon-btn" id="refreshButton"><i class="fa-solid fa-arrows-rotate"></i></div>
+      <div class="icon-btn" id="themeButton"><i class="fa-solid fa-sun" id="themeIcon"></i></div>
+    </div>
+  </header>
+
+  <!-- Stage -->
+  <div class="stage" id="stage">
+
+    <!-- Device Info Card -->
+    <div class="device-card-header">
+      <div class="device-meta-left">
+        <div class="device-icon-wrap" id="deviceIconWrap"><i class="fa-solid fa-plug"></i></div>
+        <div class="device-name-wrap">
+          <div class="device-label-tag">Smart Device</div>
+          <div class="device-name-text" id="deviceName">Loading...</div>
+        </div>
+      </div>
+      <div class="device-actions-row">
+        <div class="device-action-btn" id="renameBtn"><i class="fa-solid fa-pen"></i> Rename</div>
+        <div class="device-action-btn primary" id="roomBtn">
+          <i class="fa-solid fa-door-open"></i> <span id="roomBtnText">Add to Room</span>
+        </div>
+      </div>
+      <div class="conn-row">
+        <div class="conn-left">
+          <div class="conn-dot" id="mqttDot"></div>
+          <div>
+            <div class="conn-text" id="connectionText">Connecting...</div>
+            <div class="conn-subtext">MQTT Server</div>
+          </div>
+        </div>
+        <div class="room-badge" id="roomBadge" onclick="openRoomSheet()">
+          <i class="fa-solid fa-door-open"></i> <span id="roomBadgeText">No Room</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Power Button -->
+    <div class="power-btn-wrap">
+      <div class="power-ring-outer" id="powerRing"></div>
+      <div class="power-display power-offline" id="powerDisplay">
+        <i class="fa-solid fa-power-off power-ico"></i>
+        <div class="power-status-label" id="powerLabel">CHECKING</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         DRAGGABLE INFO PANEL
+    ══════════════════════════════════ -->
+    <div class="info-panel" id="infoPanel">
+
+      <!-- Draggable handle -->
+      <div class="panel-handle-zone" id="panelHandle">
+        <div class="panel-handle" id="panelHandleBar"></div>
+      </div>
+
+      <!-- Status message — always in view -->
+      <div class="panel-status status-checking" id="statusMessage">
+        Checking device status...
+      </div>
+
+      <!-- Everything below scrolls when panel is tall enough -->
+      <div class="panel-scroll" id="panelScroll">
+
+        <div class="panel-section-title">
+          <span>Device Details</span>
+        </div>
+        <div class="info-row">
+          <div class="info-item" style="cursor:default;">
+            <div class="info-item-icon"><i class="fa-solid fa-fingerprint"></i></div>
+            <div class="info-item-body">
+              <div class="info-item-label">Device ID</div>
+              <div class="info-item-value" id="infoDeviceId">—</div>
+            </div>
+          </div>
+          <div class="info-item" onclick="openRenameSheet()">
+            <div class="info-item-icon"><i class="fa-solid fa-tag"></i></div>
+            <div class="info-item-body">
+              <div class="info-item-label">Custom Name</div>
+              <div class="info-item-value" id="infoDeviceName">—</div>
+            </div>
+            <div class="info-item-chevron"><i class="fa-solid fa-chevron-right"></i></div>
+          </div>
+          <div class="info-item" onclick="openRoomSheet()">
+            <div class="info-item-icon"><i class="fa-solid fa-house"></i></div>
+            <div class="info-item-body">
+              <div class="info-item-label">Room</div>
+              <div class="info-item-value" id="infoDeviceRoom">Not assigned</div>
+            </div>
+            <div class="info-item-chevron"><i class="fa-solid fa-chevron-right"></i></div>
+          </div>
+        </div>
+
+        <div class="panel-section-title">
+          <span>Rooms</span>
+          <span class="panel-section-action" id="manageRoomsBtn">Manage</span>
+        </div>
+        <div class="info-row" id="roomsListContainer">
+          <div class="info-item" onclick="openRoomSheet()">
+            <div class="info-item-icon" style="color:var(--active-blue);background:rgba(10,132,255,0.1);border-color:rgba(10,132,255,0.25);"><i class="fa-solid fa-plus"></i></div>
+            <div class="info-item-body">
+              <div class="info-item-value" style="color:var(--active-blue);">Create a Room</div>
+              <div class="info-item-label" style="text-transform:none;letter-spacing:0;font-weight:500;margin-top:2px;">Group devices by location</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /panel-scroll -->
+    </div><!-- /info-panel -->
+
+  </div><!-- /stage -->
+</div><!-- /phone -->
+
+<!-- Overlay -->
+<div class="overlay" id="overlay" onclick="closeAllSheets()"></div>
+
+<!-- Sheet: Rename -->
+<div class="sheet" id="renameSheet">
+  <div class="sheet-handle-area">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back" onclick="closeSheet('renameSheet')"><i class="fa-solid fa-xmark"></i></div>
+      <div class="sheet-title">Rename Device</div>
+    </div>
+  </div>
+  <div class="sheet-scroll">
+    <div class="sheet-input-wrap">
+      <div class="sheet-input-label">Custom Name</div>
+      <input type="text" class="sheet-input" id="renameInput" placeholder="e.g. Living Room Lamp" maxlength="32">
+    </div>
+    <button class="sheet-btn primary" onclick="saveDeviceName()">Save Name</button>
+    <button class="sheet-btn secondary" onclick="closeSheet('renameSheet')">Cancel</button>
+  </div>
+</div>
+
+<!-- Sheet: Room -->
+<div class="sheet" id="roomSheet">
+  <div class="sheet-handle-area">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back" onclick="closeSheet('roomSheet')"><i class="fa-solid fa-xmark"></i></div>
+      <div class="sheet-title">Assign to Room</div>
+    </div>
+  </div>
+  <div class="sheet-scroll">
+    <div class="sheet-cat">Current Room</div>
+    <div id="roomCurrentInfo" class="room-option selected" style="display:none;">
+      <div class="room-option-icon" id="roomCurrentEmoji">🏠</div>
+      <div class="room-option-name" id="roomCurrentName">—</div>
+      <div class="room-option-count"></div>
+      <i class="fa-solid fa-check room-option-check"></i>
+    </div>
+    <div class="sheet-cat">All Rooms</div>
+    <div id="roomOptionsList"></div>
+    <button class="sheet-btn primary" style="margin-top:16px;" onclick="openCreateRoomSheet()"><i class="fa-solid fa-plus" style="margin-right:6px;"></i> Create New Room</button>
+    <button class="sheet-btn danger" id="removeFromRoomBtn" onclick="removeFromRoom()" style="display:none;"><i class="fa-solid fa-door-closed" style="margin-right:6px;"></i> Remove from Room</button>
+  </div>
+</div>
+
+<!-- Sheet: Create Room -->
+<div class="sheet" id="createRoomSheet">
+  <div class="sheet-handle-area">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back" onclick="goBackToRoomSheet()"><i class="fa-solid fa-arrow-left"></i></div>
+      <div class="sheet-title">Create Room</div>
+    </div>
+  </div>
+  <div class="sheet-scroll">
+    <div class="sheet-input-wrap">
+      <div class="sheet-input-label">Room Name</div>
+      <input type="text" class="sheet-input" id="newRoomName" placeholder="e.g. Living Room" maxlength="24">
+    </div>
+    <div class="sheet-input-wrap">
+      <div class="sheet-input-label">Choose Icon</div>
+      <div class="sheet-input-emoji-row" id="emojiPicker"></div>
+    </div>
+    <button class="sheet-btn primary" onclick="createRoom()">Create Room</button>
+    <button class="sheet-btn secondary" onclick="goBackToRoomSheet()">Cancel</button>
+  </div>
+</div>
+
+<!-- Sheet: Manage Rooms -->
+<div class="sheet" id="manageRoomsSheet">
+  <div class="sheet-handle-area">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-back" onclick="closeSheet('manageRoomsSheet')"><i class="fa-solid fa-xmark"></i></div>
+      <div class="sheet-title">Manage Rooms</div>
+    </div>
+  </div>
+  <div class="sheet-scroll">
+    <div id="manageRoomsList"></div>
+    <button class="sheet-btn primary" style="margin-top:16px;" onclick="openCreateRoomFromManage()"><i class="fa-solid fa-plus" style="margin-right:6px;"></i> Create New Room</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════
+   DRAGGABLE INFO PANEL
+═══════════════════════════════════════════ */
+
+// Three snap positions: peek (status only), mid, full
+const PEEK_HEIGHT = 82; // handle + status pill visible
+const SNAP_MID    = 0.46; // fraction of stage height
+const SNAP_FULL   = 0.88; // fraction of stage height
+
+let panelH     = PEEK_HEIGHT;
+let dragStartY = 0;
+let dragStartH = 0;
+let isDragging = false;
+let velY       = 0;
+let lastY      = 0;
+let lastT      = 0;
+
+function stageH() { return document.getElementById('stage').clientHeight; }
+
+function snapPoints() {
+  const sh = stageH();
+  return [PEEK_HEIGHT, Math.round(sh * SNAP_MID), Math.round(sh * SNAP_FULL)];
+}
+
+function setPanelH(h, animate) {
+  const panel = document.getElementById('infoPanel');
+  const maxH  = Math.round(stageH() * SNAP_FULL);
+  h = Math.max(PEEK_HEIGHT, Math.min(maxH, h));
+  panelH = h;
+  panel.style.transition = animate ? 'height 0.4s cubic-bezier(0.25,1,0.5,1)' : 'none';
+  panel.style.height = h + 'px';
+
+  // scroll lock: only allow scroll when panel is at mid or full
+  const scroll = document.getElementById('panelScroll');
+  scroll.style.overflowY = h > PEEK_HEIGHT + 20 ? 'auto' : 'hidden';
+}
+
+function snapToNearest() {
+  const pts = snapPoints();
+  let target;
+  // velocity in px/ms → positive = finger moving down = panel shrinking
+  if (velY > 0.4) {
+    // flick down → smaller snap
+    const smaller = pts.filter(p => p < panelH - 10);
+    target = smaller.length ? smaller[smaller.length - 1] : pts[0];
+  } else if (velY < -0.4) {
+    // flick up → bigger snap
+    const bigger = pts.filter(p => p > panelH + 10);
+    target = bigger.length ? bigger[0] : pts[pts.length - 1];
+  } else {
+    target = pts.reduce((a, b) => Math.abs(b - panelH) < Math.abs(a - panelH) ? b : a);
+  }
+  setPanelH(target, true);
+}
+
+function initDragPanel() {
+  const handle = document.getElementById('panelHandle');
+
+  // ── Touch ──
+  handle.addEventListener('touchstart', e => {
+    isDragging = true;
+    dragStartY = e.touches[0].clientY;
+    dragStartH = panelH;
+    velY = 0; lastY = dragStartY; lastT = performance.now();
+    handle.classList.add('is-dragging');
+    document.getElementById('infoPanel').style.transition = 'none';
+  }, { passive: true });
+
+  handle.addEventListener('touchmove', e => {
+    if (!isDragging) return;
+    const y   = e.touches[0].clientY;
+    const now = performance.now();
+    const dt  = now - lastT || 1;
+    velY      = (y - lastY) / dt;
+    lastY = y; lastT = now;
+    const delta = y - dragStartY;   // positive = finger moved down
+    setPanelH(dragStartH - delta, false);
+  }, { passive: true });
+
+  handle.addEventListener('touchend', () => {
+    isDragging = false;
+    handle.classList.remove('is-dragging');
+    snapToNearest();
+  });
+
+  // ── Mouse ──
+  handle.addEventListener('mousedown', e => {
+    isDragging = true;
+    dragStartY = e.clientY;
+    dragStartH = panelH;
+    velY = 0; lastY = dragStartY; lastT = performance.now();
+    handle.classList.add('is-dragging');
+    document.getElementById('infoPanel').style.transition = 'none';
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const now = performance.now();
+    const dt  = now - lastT || 1;
+    velY      = (e.clientY - lastY) / dt;
+    lastY = e.clientY; lastT = now;
+    const delta = e.clientY - dragStartY;
+    setPanelH(dragStartH - delta, false);
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    handle.classList.remove('is-dragging');
+    snapToNearest();
+  });
+
+  window.addEventListener('resize', () => setPanelH(PEEK_HEIGHT, true));
+}
+
+/* ═══════════════════════════════════════════
+   MQTT / DEVICE
+═══════════════════════════════════════════ */
+let mqttClient = null, deviceId = null, currentUser = null;
+let controlTopic = null, statusTopic = null, ofTopic = null;
+let currentStatus = 'OFF', lastKnownStatus = null, isOnline = false;
+let pendingCommand = null, pendingStartTime = null;
+let deviceOnlineStatus = {}, deviceTimeout = null, onlineCheckTimeout = null, statusTimeout = null;
+
+const ROOMS_KEY = 'aada_rooms', DEVICE_ROOMS_KEY = 'aada_device_rooms', DEVICE_NAMES_KEY = 'aada_device_names';
+const ROOM_EMOJIS = ['🏠','🛋️','🛏️','🍳','🚿','💼','🎮','📚','🌿','💡','🔌','🏋️','🎵','🌙','☀️','❄️'];
+let selectedEmoji = '🏠', createRoomFromManage = false;
+
+function getRooms()       { try { return JSON.parse(localStorage.getItem(ROOMS_KEY)||'[]'); } catch { return []; } }
+function saveRooms(r)     { localStorage.setItem(ROOMS_KEY, JSON.stringify(r)); }
+function getDeviceRooms() { try { return JSON.parse(localStorage.getItem(DEVICE_ROOMS_KEY)||'{}'); } catch { return {}; } }
+function saveDeviceRooms(r){ localStorage.setItem(DEVICE_ROOMS_KEY, JSON.stringify(r)); }
+function getDeviceNames() { try { return JSON.parse(localStorage.getItem(DEVICE_NAMES_KEY)||'{}'); } catch { return {}; } }
+function saveDeviceNames(r){ localStorage.setItem(DEVICE_NAMES_KEY, JSON.stringify(r)); }
+function getDeviceName()  { const n=getDeviceNames(); return n[deviceId]||deviceId; }
+function getDeviceRoom()  { const dr=getDeviceRooms(), rooms=getRooms(), id=dr[deviceId]; if(!id) return null; return rooms.find(r=>r.id===id)||null; }
+function getDevicesInRoom(rid){ const dr=getDeviceRooms(); return Object.entries(dr).filter(([,r])=>r===rid).map(([d])=>d); }
+
+/* ── Theme ── */
+function loadTheme() {
+  const t = localStorage.getItem('theme') || localStorage.getItem('dashboardTheme') || 'dark';
+  document.documentElement.setAttribute('data-theme', t); updateThemeIcon(t);
+}
+function updateThemeIcon(t) { document.getElementById('themeIcon').className = t==='light' ? 'fa-solid fa-moon' : 'fa-solid fa-sun'; }
+function performToggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next); localStorage.setItem('dashboardTheme', next);
+  updateThemeIcon(next);
+}
+window.addEventListener('storage', e => {
+  if (e.key==='theme'||e.key==='dashboardTheme') { document.documentElement.setAttribute('data-theme', e.newValue||'dark'); updateThemeIcon(e.newValue||'dark'); }
+});
+
+/* ── Toast ── */
+function showToast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ── Modal sheets ── */
+function openSheet(id)    { document.getElementById('overlay').classList.add('show'); document.getElementById(id).classList.add('show'); }
+function closeSheet(id)   { document.getElementById(id).classList.remove('show'); if (!document.querySelector('.sheet.show')) document.getElementById('overlay').classList.remove('show'); }
+function closeAllSheets() { document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('show')); document.getElementById('overlay').classList.remove('show'); }
+
+/* ── Rename ── */
+function openRenameSheet() {
+  const inp=document.getElementById('renameInput'), cur=getDeviceName();
+  inp.value = cur===deviceId ? '' : cur;
+  openSheet('renameSheet'); setTimeout(()=>inp.focus(),300);
+}
+function saveDeviceName() {
+  const val=document.getElementById('renameInput').value.trim();
+  if (!val) { showToast('Please enter a name'); return; }
+  const n=getDeviceNames(); n[deviceId]=val; saveDeviceNames(n);
+  updateDeviceDisplay(); closeSheet('renameSheet'); showToast('Device renamed');
+}
+
+/* ── Room ── */
+function openRoomSheet() { renderRoomOptions(); openSheet('roomSheet'); }
+function renderRoomOptions() {
+  const rooms=getRooms(), cur=getDeviceRoom();
+  const list=document.getElementById('roomOptionsList');
+  const curInfo=document.getElementById('roomCurrentInfo');
+  const removeBtn=document.getElementById('removeFromRoomBtn');
+  if (cur) {
+    document.getElementById('roomCurrentEmoji').textContent=cur.emoji||'🏠';
+    document.getElementById('roomCurrentName').textContent=cur.name;
+    curInfo.style.display='flex'; removeBtn.style.display='block';
+  } else { curInfo.style.display='none'; removeBtn.style.display='none'; }
+  if (!rooms.length) { list.innerHTML='<div class="empty-rooms"><i class="fa-solid fa-door-open"></i>No rooms yet. Create one below.</div>'; return; }
+  list.innerHTML = rooms.map(room => {
+    const cnt=getDevicesInRoom(room.id).length, sel=cur&&cur.id===room.id;
+    return `<div class="room-option ${sel?'selected':''}" onclick="assignToRoom('${room.id}')">
+      <div class="room-option-icon">${room.emoji||'🏠'}</div>
+      <div class="room-option-name">${esc(room.name)}</div>
+      <div class="room-option-count">${cnt} device${cnt!==1?'s':''}</div>
+      <i class="fa-solid fa-check room-option-check"></i>
+    </div>`;
+  }).join('');
+}
+function assignToRoom(rid) {
+  const dr=getDeviceRooms(); dr[deviceId]=rid; saveDeviceRooms(dr);
+  updateDeviceDisplay(); closeSheet('roomSheet');
+  const r=getRooms().find(r=>r.id===rid); showToast(`Added to ${r?r.name:'room'}`);
+}
+function removeFromRoom() {
+  const dr=getDeviceRooms(); delete dr[deviceId]; saveDeviceRooms(dr);
+  updateDeviceDisplay(); closeSheet('roomSheet'); showToast('Removed from room');
+}
+
+/* ── Create Room ── */
+function openCreateRoomSheet() {
+  createRoomFromManage=false; document.getElementById('newRoomName').value='';
+  selectedEmoji='🏠'; renderEmojiPicker();
+  closeSheet('roomSheet'); openSheet('createRoomSheet');
+  setTimeout(()=>document.getElementById('newRoomName').focus(),300);
+}
+function openCreateRoomFromManage() {
+  createRoomFromManage=true; document.getElementById('newRoomName').value='';
+  selectedEmoji='🏠'; renderEmojiPicker();
+  closeSheet('manageRoomsSheet'); openSheet('createRoomSheet');
+  setTimeout(()=>document.getElementById('newRoomName').focus(),300);
+}
+function goBackToRoomSheet() {
+  closeSheet('createRoomSheet');
+  if (createRoomFromManage) { openSheet('manageRoomsSheet'); renderManageRooms(); }
+  else { openSheet('roomSheet'); renderRoomOptions(); }
+}
+function renderEmojiPicker() {
+  document.getElementById('emojiPicker').innerHTML = ROOM_EMOJIS.map(e =>
+    `<div class="emoji-btn ${e===selectedEmoji?'selected':''}" onclick="selectEmoji('${e}')">${e}</div>`).join('');
+}
+function selectEmoji(e) { selectedEmoji=e; renderEmojiPicker(); }
+function createRoom() {
+  const name=document.getElementById('newRoomName').value.trim();
+  if (!name) { showToast('Please enter a room name'); return; }
+  const rooms=getRooms();
+  if (rooms.find(r=>r.name.toLowerCase()===name.toLowerCase())) { showToast('Room already exists'); return; }
+  const room={id:'room_'+Date.now(),name,emoji:selectedEmoji};
+  rooms.push(room); saveRooms(rooms);
+  if (!createRoomFromManage) { const dr=getDeviceRooms(); dr[deviceId]=room.id; saveDeviceRooms(dr); }
+  updateDeviceDisplay(); closeSheet('createRoomSheet'); showToast(`Room "${name}" created`);
+}
+
+/* ── Manage Rooms ── */
+function openManageRooms() { renderManageRooms(); openSheet('manageRoomsSheet'); }
+function renderManageRooms() {
+  const rooms=getRooms(), list=document.getElementById('manageRoomsList');
+  if (!rooms.length) { list.innerHTML='<div class="empty-rooms"><i class="fa-solid fa-door-open"></i>No rooms yet.</div>'; return; }
+  list.innerHTML = rooms.map(room => {
+    const cnt=getDevicesInRoom(room.id).length;
+    return `<div class="sheet-item">
+      <div class="item-icon">${room.emoji||'🏠'}</div>
+      <div class="item-body"><div class="item-title">${esc(room.name)}</div><div class="item-sub">${cnt} device${cnt!==1?'s':''}</div></div>
+      <div style="display:flex;gap:8px;">
+        <div class="icon-btn" style="width:34px;height:34px;font-size:13px;" onclick="editRoomPrompt('${room.id}')"><i class="fa-solid fa-pen"></i></div>
+        <div class="icon-btn" style="width:34px;height:34px;font-size:13px;color:var(--danger);" onclick="deleteRoom('${room.id}')"><i class="fa-solid fa-trash"></i></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function editRoomPrompt(rid) {
+  const rooms=getRooms(), room=rooms.find(r=>r.id===rid); if (!room) return;
+  const name=prompt('Rename room:',room.name); if (!name||!name.trim()) return;
+  room.name=name.trim(); saveRooms(rooms); renderManageRooms(); updateDeviceDisplay(); showToast('Room renamed');
+}
+function deleteRoom(rid) {
+  if (!confirm('Delete this room? Devices will be unassigned.')) return;
+  let rooms=getRooms().filter(r=>r.id!==rid); saveRooms(rooms);
+  const dr=getDeviceRooms(); Object.keys(dr).forEach(d=>{if(dr[d]===rid)delete dr[d];}); saveDeviceRooms(dr);
+  renderManageRooms(); updateDeviceDisplay(); showToast('Room deleted');
+}
+
+/* ── Display update ── */
+function updateDeviceDisplay() {
+  const name=getDeviceName(), room=getDeviceRoom();
+  document.getElementById('deviceName').textContent=name;
+  document.getElementById('infoDeviceId').textContent=deviceId;
+  document.getElementById('infoDeviceName').textContent=name;
+  document.getElementById('infoDeviceRoom').textContent=room?`${room.emoji||''} ${room.name}`:'Not assigned';
+  document.getElementById('roomBadgeText').textContent=room?room.name:'No Room';
+  document.getElementById('roomBadge').classList.toggle('has-room',!!room);
+  document.getElementById('roomBtnText').textContent=room?room.name:'Add to Room';
+  renderRoomsList();
+}
+function renderRoomsList() {
+  const rooms=getRooms(), cur=getDeviceRoom(), c=document.getElementById('roomsListContainer');
+  if (!rooms.length) {
+    c.innerHTML=`<div class="info-item" onclick="openRoomSheet()">
+      <div class="info-item-icon" style="color:var(--active-blue);background:rgba(10,132,255,0.1);border-color:rgba(10,132,255,0.25);"><i class="fa-solid fa-plus"></i></div>
+      <div class="info-item-body"><div class="info-item-value" style="color:var(--active-blue);">Create a Room</div><div class="info-item-label" style="text-transform:none;letter-spacing:0;font-weight:500;margin-top:2px;">Group devices by location</div></div>
+    </div>`;
+    return;
+  }
+  c.innerHTML = rooms.map(room => {
+    const cnt=getDevicesInRoom(room.id).length, isThis=cur&&cur.id===room.id;
+    return `<div class="info-item" onclick="assignToRoom('${room.id}')">
+      <div class="info-item-icon" style="${isThis?'background:rgba(10,132,255,0.12);border-color:rgba(10,132,255,0.3);color:var(--active-blue);':''}">${room.emoji||'🏠'}</div>
+      <div class="info-item-body"><div class="info-item-label">${isThis?'CURRENT ROOM':'ROOM'}</div><div class="info-item-value">${esc(room.name)}</div></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:12px;color:var(--text-secondary);font-weight:500;">${cnt} device${cnt!==1?'s':''}</span>
+        ${isThis?'<i class="fa-solid fa-check" style="color:var(--active-blue);font-size:13px;"></i>':'<i class="fa-solid fa-chevron-right" style="color:var(--text-tertiary);font-size:11px;"></i>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+function esc(s) { return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+/* ── Haptic ── */
+function shouldHapticController(){ return localStorage.getItem('hapticsController')==='true'; }
+function shouldHapticAll(){ return localStorage.getItem('hapticsAll')==='true'; }
+function getHapticIntensity(){ const s=localStorage.getItem('hapticsIntensity'); return s?parseInt(s):50; }
+function hapticFeedback(d){ if('vibrate' in navigator&&d>0) navigator.vibrate(d); }
+function withHaptic(fn){ return function(e){ const id=e.currentTarget.id; if(shouldHapticAll()||(shouldHapticController()&&id==='powerDisplay')) hapticFeedback(getHapticIntensity()); if(fn) fn(e); }; }
+
+/* ── Init ── */
+function init() {
+  loadTheme();
+  renderEmojiPicker();
+  initDragPanel();
+
+  // Set initial peek height after layout
+  requestAnimationFrame(() => { setPanelH(PEEK_HEIGHT, false); });
+
+  deviceId = sessionStorage.getItem('active_device');
+  if (!deviceId) { alert('No device selected'); window.location.href='dashboard.html'; return; }
+  const userStr = sessionStorage.getItem('current_user');
+  if (!userStr) { alert('Not logged in'); window.location.href='login.html'; return; }
+  try { currentUser=JSON.parse(userStr); }
+  catch { alert('Session error'); window.location.href='login.html'; return; }
+
+  controlTopic = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${deviceId}/control`;
+  statusTopic  = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${deviceId}/status`;
+  ofTopic      = `smartplug/${currentUser.hashed_email}/${currentUser.hashed_password}/${deviceId}/OF`;
+
+  updateDeviceDisplay();
+
+  try {
+    const cached=sessionStorage.getItem('device_status_cache');
+    if (cached) {
+      const cache=JSON.parse(cached);
+      if (cache&&typeof cache==='object') {
+        const age=Date.now()-(cache.timestamp||0);
+        if (age<10000&&cache.status) {
+          const norm=cache.status.toUpperCase();
+          if (cache.status==='offline') { lastKnownStatus=null; isOnline=false; deviceOnlineStatus[deviceId]='offline'; goOffline(); }
+          else if (norm==='ON'||norm==='OFF') { currentStatus=norm; lastKnownStatus=norm; isOnline=cache.isOnline===true; deviceOnlineStatus[deviceId]=norm; applyPowerState(norm); }
+        }
+      }
+      sessionStorage.removeItem('device_status_cache');
+    }
+  } catch(e) { sessionStorage.removeItem('device_status_cache'); }
+
+  connectMQTT();
+}
+
+function applyPowerState(state) {
+  const pd=document.getElementById('powerDisplay'), label=document.getElementById('powerLabel'), msg=document.getElementById('statusMessage');
+  if (state==='ON') {
+    pd.className='power-display power-on'; label.textContent='ON';
+    msg.textContent='Device is ON'; msg.className='panel-status status-on';
+    document.getElementById('deviceIconWrap').style.cssText='background:var(--online-dim);border-color:rgba(48,209,88,0.3);color:var(--online);';
+  } else if (state==='OFF') {
+    pd.className='power-display power-off'; label.textContent='OFF';
+    msg.textContent='Device is OFF'; msg.className='panel-status status-off';
+    document.getElementById('deviceIconWrap').style.cssText='';
+  }
+}
+
+function connectMQTT() {
+  try {
+    mqttClient=mqtt.connect('wss://y1dda1f8.ala.asia-southeast1.emqxsl.com:8084/mqtt',{username:'AADAconnect',password:'wMhtXcU86UtV-48'});
+    mqttClient.on('connect',()=>{ updateConnectionStatus(true); mqttClient.subscribe(statusTopic); mqttClient.subscribe(ofTopic,()=>checkDeviceStatus()); });
+    mqttClient.on('message',(topic,message)=>handleMQTTMessage(topic,message));
+    const onErr=()=>updateConnectionStatus(false);
+    mqttClient.on('error',onErr); mqttClient.on('close',onErr);
+  } catch(e) { updateConnectionStatus(false); }
+}
+function updateConnectionStatus(connected) {
+  document.getElementById('mqttDot').className=connected?'conn-dot connected':'conn-dot';
+  document.getElementById('connectionText').textContent=connected?'Connected':'Disconnected';
+}
+function handleMQTTMessage(topic,message) {
+  const last=topic.split('/').pop();
+  if (last==='OF') {
+    const raw=message.toString().trim(), lower=raw.toLowerCase();
+    if (lower==='check_status') return;
+    if (deviceTimeout){clearTimeout(deviceTimeout);deviceTimeout=null;}
+    if (onlineCheckTimeout){clearTimeout(onlineCheckTimeout);onlineCheckTimeout=null;}
+    if (lower==='offline'){deviceOnlineStatus[deviceId]='offline';goOffline();return;}
+    deviceOnlineStatus[deviceId]=raw; isOnline=true;
+    const msg=document.getElementById('statusMessage');
+    if (!pendingCommand) {
+      if (currentStatus==='ON') applyPowerState('ON');
+      else if (currentStatus==='OFF') applyPowerState('OFF');
+      else { msg.textContent='Device is online'; msg.className='panel-status status-pending'; }
+    }
+  }
+  if (last==='status') handleStatusUpdate(message.toString().trim().toUpperCase());
+}
+function checkDeviceStatus(manualRefresh=false) {
+  const hadValid=deviceOnlineStatus[deviceId]==='ON'||deviceOnlineStatus[deviceId]==='OFF';
+  const alreadyOffline=!manualRefresh&&(deviceOnlineStatus[deviceId]==='offline'||!isOnline);
+  deviceOnlineStatus[deviceId]='Checking...';
+  const msg=document.getElementById('statusMessage'),pd=document.getElementById('powerDisplay'),label=document.getElementById('powerLabel');
+  if (!pendingCommand&&!hadValid&&!alreadyOffline) {
+    msg.textContent='Checking device status...'; msg.className='panel-status status-checking';
+    pd.className='power-display power-offline'; label.textContent='CHECKING';
+  }
+  mqttClient.publish(ofTopic,'check_status');
+  onlineCheckTimeout=setTimeout(()=>{if(deviceOnlineStatus[deviceId]==='Checking...'){deviceOnlineStatus[deviceId]='offline';goOffline();}},5000);
+}
+function showPendingState(command) {
+  const pd=document.getElementById('powerDisplay'),label=document.getElementById('powerLabel'),msg=document.getElementById('statusMessage');
+  document.getElementById('powerRing').classList.add('rotating');
+  pd.className='power-display power-pending'; label.textContent='PENDING';
+  msg.textContent=`Turning ${command==='1'?'ON':'OFF'}...`; msg.className='panel-status status-pending';
+  pendingStartTime=Date.now();
+}
+function hidePendingState(success=true) {
+  document.getElementById('powerRing').classList.remove('rotating');
+  if (success) { const pd=document.getElementById('powerDisplay'); pd.classList.add('success-anim'); setTimeout(()=>pd.classList.remove('success-anim'),500); }
+  pendingCommand=null; pendingStartTime=null;
+}
+function handleStatusUpdate(status) {
+  if (onlineCheckTimeout){clearTimeout(onlineCheckTimeout);onlineCheckTimeout=null;}
+  if (statusTimeout){clearTimeout(statusTimeout);statusTimeout=null;}
+  if (status.toLowerCase()==='offline'){goOffline();return;}
+  if (status==='ON'||status==='OFF') {
+    isOnline=true;
+    if (deviceOnlineStatus[deviceId]==='Checking...'||deviceOnlineStatus[deviceId]==='offline') deviceOnlineStatus[deviceId]=status;
+    const wasConfirmed=pendingCommand!==null&&((pendingCommand==='1'&&status==='ON')||(pendingCommand==='0'&&status==='OFF'));
+    if (wasConfirmed){hidePendingState(true);if(shouldHapticController()||shouldHapticAll())hapticFeedback(getHapticIntensity());}
+    currentStatus=status; lastKnownStatus=status; applyPowerState(status);
+  } else { goOffline(); }
+}
+function goOffline() {
+  isOnline=false; deviceOnlineStatus[deviceId]='offline'; hidePendingState(false);
+  const pd=document.getElementById('powerDisplay'),label=document.getElementById('powerLabel'),msg=document.getElementById('statusMessage');
+  pd.className='power-display power-offline'; label.textContent='OFFLINE';
+  document.getElementById('deviceIconWrap').style.cssText='';
+  msg.textContent=lastKnownStatus==='ON'?'Last known: ON (offline)':lastKnownStatus==='OFF'?'Last known: OFF (offline)':'Device is offline';
+  msg.className='panel-status status-offline';
+}
+function performTogglePower() {
+  if (!mqttClient||!mqttClient.connected){alert('Not connected to server');return;}
+  if (!isOnline){alert('Device is offline');return;}
+  if (pendingCommand!==null) return;
+  const command=currentStatus==='ON'?'0':'1';
+  pendingCommand=command; showPendingState(command);
+  mqttClient.publish(controlTopic,command);
+  if (statusTimeout) clearTimeout(statusTimeout);
+  statusTimeout=setTimeout(()=>goOffline(),5000);
+}
+function performRefresh() {
+  if (!mqttClient||!mqttClient.connected){alert('Not connected to server');return;}
+  const btn=document.getElementById('refreshButton');
+  btn.style.transform='rotate(360deg)'; btn.style.transition='transform 0.5s ease';
+  setTimeout(()=>{btn.style.transform='';btn.style.transition='';},500);
+  checkDeviceStatus(true);
+}
+function performGoBack() { window.location.href='dashboard.html'; }
+
+window.onload=function(){
+  init();
+  document.getElementById('powerDisplay').addEventListener('click',withHaptic(performTogglePower));
+  document.getElementById('backButton').addEventListener('click',withHaptic(performGoBack));
+  document.getElementById('refreshButton').addEventListener('click',withHaptic(performRefresh));
+  document.getElementById('themeButton').addEventListener('click',withHaptic(performToggleTheme));
+  document.getElementById('renameBtn').addEventListener('click',openRenameSheet);
+  document.getElementById('roomBtn').addEventListener('click',openRoomSheet);
+  document.getElementById('manageRoomsBtn').addEventListener('click',openManageRooms);
+};
+window.onbeforeunload=function(){
+  if(mqttClient&&mqttClient.connected)mqttClient.end();
+  if(deviceTimeout)clearTimeout(deviceTimeout);
+  if(onlineCheckTimeout)clearTimeout(onlineCheckTimeout);
+  if(statusTimeout)clearTimeout(statusTimeout);
+};
+</script>
+</body>
+</html>
