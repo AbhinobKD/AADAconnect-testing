@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#020203">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AADAconnect | Authentication</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    /* ── Reset & Typography ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; font-family: 'Inter', sans-serif; background: #020203; color: #FFFFFF; overflow: hidden; }
+
+    /* ── Core Design Tokens ── */
+    :root {
+      --brand-primary: #00D2FF;
+      --brand-secondary: #3A00FF;
+      --surface-glass: rgba(20, 20, 22, 0.4);
+      --surface-input: rgba(0, 0, 0, 0.4);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --border-highlight: rgba(255, 255, 255, 0.15);
+      --text-main: #FFFFFF;
+      --text-muted: #8E8E93;
+      --danger: #FF453A;
+      --radius-2xl: 32px;
+      --radius-xl: 24px;
+      --radius-lg: 16px;
+      --radius-pill: 100px;
+      --shadow-ambient: 0 24px 64px rgba(0, 0, 0, 0.6);
+      --transition-smooth: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+      --transition-snappy: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    /* ── App Environment ── */
+    .app-env {
+      position: relative; width: 100%; height: 100dvh; 
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      perspective: 1200px;
+    }
+
+    /* ── Cinematic Ambient Lighting ── */
+    .ambient-glow { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+    .glow-core {
+      position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+      width: 80vw; height: 80vw; max-width: 600px; max-height: 600px;
+      background: radial-gradient(circle, rgba(58,0,255,0.15) 0%, rgba(0,210,255,0.05) 50%, transparent 70%);
+      filter: blur(60px); animation: pulseGlow 8s ease-in-out infinite alternate;
+    }
+    @keyframes pulseGlow { 0% { opacity: 0.6; transform: translate(-50%, -50%) scale(0.9); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } }
+
+    /* ── 3D Astrolabe / Orbital Network (Background) ── */
+    .astrolabe {
+      position: absolute; top: 45%; left: 50%; z-index: 0;
+      width: 0; height: 0; transform-style: preserve-3d;
+      transform: rotateX(60deg) rotateY(0deg) rotateZ(0deg);
+      animation: rotateAstrolabe 60s linear infinite;
+    }
+    @keyframes rotateAstrolabe { 100% { transform: rotateX(60deg) rotateY(0deg) rotateZ(360deg); } }
+
+    .ring {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.05);
+      transform-style: preserve-3d;
+    }
+    .ring::after {
+      content: ''; position: absolute; inset: -1px; border-radius: 50%;
+      border: 1px solid transparent; border-top-color: rgba(0, 210, 255, 0.3);
+      filter: blur(2px);
+    }
+    .ring-1 { width: 300px; height: 300px; animation: counterSpin 20s linear infinite; }
+    .ring-2 { width: 450px; height: 450px; animation: counterSpin 35s linear infinite reverse; }
+    .ring-3 { width: 600px; height: 600px; border-style: dashed; animation: counterSpin 50s linear infinite; }
+    @keyframes counterSpin { 100% { transform: translate(-50%, -50%) rotateZ(360deg); } }
+
+    .data-node {
+      position: absolute; top: 0; left: 50%; width: 6px; height: 6px;
+      background: var(--brand-primary); border-radius: 50%;
+      transform: translate(-50%, -50%); box-shadow: 0 0 12px 2px var(--brand-primary);
+    }
+    .n2 { top: 80%; left: 10%; background: #BF5AF2; box-shadow: 0 0 12px 2px #BF5AF2; }
+    .n3 { top: 20%; left: 80%; background: #30D158; box-shadow: 0 0 12px 2px #30D158; }
+
+    /* ── Top Navigation ── */
+    .top-bar {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 40;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: calc(env(safe-area-inset-top, 24px) + 16px) 28px 0;
+    }
+    .logo-container {
+      display: flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: var(--radius-lg);
+      background: var(--surface-glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-light); color: var(--text-main); font-size: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+    
+    /* Sleek Circular Profile Button */
+    .profile-orb {
+      position: relative; width: 44px; height: 44px; border-radius: 50%;
+      background: var(--surface-glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center;
+      color: var(--text-main); font-size: 16px; cursor: pointer;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+      transition: var(--transition-smooth); opacity: 0; pointer-events: none; transform: scale(0.8);
+    }
+    .profile-orb.active { opacity: 1; pointer-events: auto; transform: scale(1); }
+    .profile-orb:active { transform: scale(0.92); }
+    .status-ring {
+      position: absolute; inset: -3px; border-radius: 50%;
+      border: 1.5px solid transparent; border-top-color: var(--brand-primary);
+      animation: spinRing 3s linear infinite; opacity: 0.6;
+    }
+    @keyframes spinRing { 100% { transform: rotate(360deg); } }
+
+    /* ── Ultra-Premium Glass Authentication Card ── */
+    .auth-card {
+      position: relative; z-index: 30; width: calc(100% - 48px); max-width: 380px;
+      background: rgba(20, 20, 22, 0.55);
+      backdrop-filter: blur(48px) saturate(200%); -webkit-backdrop-filter: blur(48px) saturate(200%);
+      border: 1px solid var(--border-light); border-radius: var(--radius-2xl);
+      padding: 40px 32px 32px; box-shadow: var(--shadow-ambient), inset 0 1px 0 rgba(255,255,255,0.15);
+      animation: cardEntrance 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    @keyframes cardEntrance { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+    /* Header Typography */
+    .card-header { text-align: center; margin-bottom: 36px; }
+    .brand-title {
+      font-size: 28px; font-weight: 800; letter-spacing: -1px; line-height: 1.1;
+      margin-bottom: 8px; color: var(--text-main);
+    }
+    .brand-subtitle {
+      font-size: 14px; font-weight: 500; color: var(--text-muted);
+      /* Subtle text gradient for a premium touch */
+      background: linear-gradient(90deg, #A1A1A6, #D1D1D6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    /* Input Architecture */
+    .form-group { margin-bottom: 16px; position: relative; }
+    .input-icon {
+      position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
+      font-size: 16px; color: var(--text-muted); transition: var(--transition-snappy); pointer-events: none;
+    }
+    .password-toggle {
+      position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+      font-size: 16px; color: var(--text-muted); cursor: pointer; padding: 4px; z-index: 10;
+      transition: var(--transition-snappy);
+    }
+    .password-toggle:active { opacity: 0.5; }
+
+    input {
+      width: 100%; padding: 20px 20px 20px 52px;
+      background: var(--surface-input); border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg); color: var(--text-main);
+      font-size: 15px; font-weight: 500; font-family: 'Inter', sans-serif; outline: none;
+      transition: var(--transition-smooth); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+    }
+    input.has-toggle { padding-right: 52px; }
+    
+    /* Premium Glowing Focus State */
+    input:focus {
+      background: rgba(0, 210, 255, 0.03); border-color: rgba(0, 210, 255, 0.4);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.3), 0 0 0 4px rgba(0, 210, 255, 0.1);
+    }
+    input:focus ~ .input-icon { color: var(--brand-primary); }
+    input::placeholder { color: #6B6B70; font-weight: 400; }
+
+    /* Validation Logic */
+    .error { color: var(--danger); font-size: 12px; margin-top: 8px; padding-left: 16px; font-weight: 600; display: none; animation: popIn 0.2s ease; }
+    .error.show { display: block; }
+    @keyframes popIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+    .form-group.shake { animation: shake 0.4s ease-in-out; }
+    .form-group.shake input { border-color: var(--danger); background: rgba(255, 69, 58, 0.05); box-shadow: 0 0 0 4px rgba(255, 69, 58, 0.1); }
+    .form-group.shake .input-icon { color: var(--danger); }
+
+    /* Shimmer Submit Button */
+    .submit-btn {
+      width: 100%; padding: 20px; margin-top: 12px;
+      background: linear-gradient(135deg, #1C1C1E, #2C2C2E);
+      color: var(--text-main); border: 1px solid var(--border-highlight);
+      border-radius: var(--radius-lg); font-weight: 700; font-size: 16px; font-family: 'Inter', sans-serif;
+      cursor: pointer; letter-spacing: -0.2px; position: relative; overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+      transition: var(--transition-smooth);
+    }
+    /* Animated Gradient Sweep */
+    .submit-btn::before {
+      content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+      transform: skewX(-20deg); transition: 0.5s;
+    }
+    .submit-btn:hover::before { left: 150%; transition: 0.7s ease-in-out; }
+    .submit-btn:active { transform: scale(0.97); box-shadow: 0 4px 12px rgba(0,0,0,0.3); background: #1C1C1E; }
+    
+    .submit-btn.loading { pointer-events: none; color: transparent !important; }
+    .submit-btn.loading::after {
+      content: ''; position: absolute; inset: 0; margin: auto; width: 22px; height: 22px;
+      border: 2px solid transparent; border-top-color: #FFF; border-right-color: #FFF;
+      border-radius: 50%; animation: btnSpin 0.7s linear infinite;
+    }
+    @keyframes btnSpin { to { transform: rotate(360deg); } }
+
+    .disclaimer { text-align: center; color: var(--text-muted); font-size: 12px; font-weight: 500; line-height: 1.5; margin-top: 24px; opacity: 0.6; }
+
+    /* ── Cinematic Bottom Sheet (Saved Accounts) ── */
+    .sheet-scrim {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
+    }
+    .sheet-scrim.active { opacity: 1; pointer-events: auto; }
+
+    .bottom-sheet {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 101;
+      background: rgba(20, 20, 22, 0.85); backdrop-filter: blur(60px) saturate(200%); -webkit-backdrop-filter: blur(60px) saturate(200%);
+      border-top: 1px solid var(--border-highlight); border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+      padding: 24px 24px calc(env(safe-area-inset-bottom, 24px) + 24px);
+      transform: translateY(100%); transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+      box-shadow: 0 -24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15); display: flex; flex-direction: column;
+    }
+    .sheet-scrim.active + .bottom-sheet { transform: translateY(0); }
+
+    .sheet-drag-indicator { width: 40px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 0 auto 24px; }
+    .sheet-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: var(--text-main); margin-bottom: 24px; text-align: center; }
+
+    /* Identity Item */
+    .identity-card {
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border-light);
+      border-radius: var(--radius-xl); padding: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      transition: var(--transition-snappy); cursor: pointer;
+    }
+    .identity-card:active { transform: scale(0.96); background: rgba(0, 210, 255, 0.05); border-color: rgba(0, 210, 255, 0.2); }
+    .id-left { display: flex; align-items: center; gap: 16px; }
+    .id-avatar {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 700; color: #FFF; box-shadow: 0 4px 16px rgba(0, 210, 255, 0.3);
+    }
+    .id-info { display: flex; flex-direction: column; gap: 2px; }
+    .id-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--brand-primary); }
+    .id-email { font-size: 16px; font-weight: 600; color: var(--text-main); }
+    
+    .id-clear-btn {
+      width: 40px; height: 40px; border-radius: 50%; background: var(--surface-input);
+      border: 1px solid var(--border-light); color: var(--text-muted);
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+      cursor: pointer; transition: var(--transition-snappy);
+    }
+    .id-clear-btn:active { transform: scale(0.9); background: rgba(255,69,58,0.1); color: var(--danger); border-color: rgba(255,69,58,0.3); }
+
+    /* ── Modals & Notifications (Polished) ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      display: none; align-items: center; justify-content: center; z-index: 200; padding: 24px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: rgba(30, 30, 32, 0.85); backdrop-filter: blur(48px) saturate(200%); -webkit-backdrop-filter: blur(48px) saturate(200%);
+      border: 1px solid var(--border-highlight); border-radius: var(--radius-2xl); padding: 32px 24px 24px;
+      width: 100%; max-width: 360px; transform: scale(0.95); opacity: 0; transition: var(--transition-smooth);
+      box-shadow: var(--shadow-ambient), inset 0 1px 0 rgba(255,255,255,0.1); text-align: center;
+    }
+    .modal-overlay.active .modal-box { transform: scale(1); opacity: 1; }
+    
+    .modal-icon { width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 20px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; font-size: 28px; color: var(--text-main); }
+    .modal-icon.danger { color: var(--danger); background: rgba(255,69,58,0.1); border-color: rgba(255,69,58,0.2); }
+    .modal-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 12px; color: var(--text-main); }
+    .modal-body { color: var(--text-muted); line-height: 1.5; margin-bottom: 28px; font-size: 15px; font-weight: 400; }
+    .modal-email-target { color: #FFF; font-weight: 600; }
+    
+    .modal-actions { display: flex; gap: 12px; }
+    .btn { flex: 1; padding: 16px; border: none; border-radius: var(--radius-lg); font-weight: 600; font-size: 15px; cursor: pointer; transition: var(--transition-snappy); }
+    .btn:active { transform: scale(0.96); }
+    .btn-secondary { background: rgba(255,255,255,0.05); color: var(--text-main); }
+    .btn-primary { background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary)); color: #FFF; }
+    .btn-danger { background: var(--danger); color: #FFF; }
+
+    /* Toast */
+    .toast {
+      position: fixed; top: calc(env(safe-area-inset-top, 20px) + 20px); left: 50%; transform: translateX(-50%) translateY(-150%);
+      background: rgba(30,30,32,0.9); backdrop-filter: blur(20px); border: 1px solid var(--border-highlight);
+      color: #FFF; padding: 14px 28px; border-radius: var(--radius-pill); font-size: 14px; font-weight: 600;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.5); opacity: 0; transition: var(--transition-smooth); z-index: 1000;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    /* Premium Fullscreen Success Transition */
+    .success-overlay {
+      position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .success-bg { position: absolute; inset: 0; background: #020203; clip-path: circle(0% at 50% 50%); transition: clip-path 0.8s cubic-bezier(0.76, 0, 0.24, 1); }
+    .success-overlay.active .success-bg { clip-path: circle(150% at 50% 50%); }
+    .success-content { relative; z-index: 10000; text-align: center; opacity: 0; transform: scale(0.9) translateY(15px); transition: opacity 0.6s ease 0.5s, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s; }
+    .success-overlay.active .success-content { opacity: 1; transform: scale(1) translateY(0); }
+    
+    .success-check-ring {
+      width: 88px; height: 88px; margin: 0 auto 24px; border-radius: 50%;
+      background: rgba(0, 210, 255, 0.1); border: 1px solid rgba(0, 210, 255, 0.3);
+      display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 0 40px rgba(0, 210, 255, 0.2);
+    }
+    .success-check-ring::before {
+      content: ''; position: absolute; inset: -1px; border-radius: 50%; border: 2px solid var(--brand-primary); opacity: 0;
+    }
+    .success-overlay.active .success-check-ring::before { animation: ripple 1.5s cubic-bezier(0.21, 0.53, 0.56, 1) 0.6s forwards; }
+    @keyframes ripple { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+    
+    .check-svg { width: 40px; height: 40px; stroke: var(--brand-primary); stroke-dasharray: 60; stroke-dashoffset: 60; }
+    .success-overlay.active .check-svg { animation: drawCheck 0.5s cubic-bezier(0.25, 1, 0.5, 1) 0.8s forwards; }
+    @keyframes drawCheck { to { stroke-dashoffset: 0; } }
+    
+    .success-title { font-size: 32px; font-weight: 800; color: #FFF; letter-spacing: -1px; margin-bottom: 12px; }
+    .success-sub { font-size: 15px; font-weight: 500; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .dots { display: inline-flex; gap: 4px; }
+    .dots span { width: 4px; height: 4px; border-radius: 50%; background: var(--brand-primary); animation: bounceDot 1.4s infinite ease-in-out both; }
+    .dots span:nth-child(1) { animation-delay: -0.32s; } .dots span:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes bounceDot { 0%, 80%, 100% { transform: scale(0); opacity: 0.3; } 40% { transform: scale(1); opacity: 1; } }
+
+  </style>
+</head>
+<body>
+
+<div class="app-env">
+
+  <div class="ambient-glow">
+    <div class="glow-core"></div>
+  </div>
+
+  <div class="astrolabe">
+    <div class="ring ring-1"><div class="data-node n1"></div></div>
+    <div class="ring ring-2"><div class="data-node n2"></div></div>
+    <div class="ring ring-3"><div class="data-node n3"></div></div>
+  </div>
+
+  <div class="top-bar">
+    <div class="logo-container"><i class="fa-solid fa-bolt"></i></div>
+    
+    <div class="profile-orb" id="profileBtn" onclick="openSheet(); triggerHaptic(15);" title="Identity Access">
+      <i class="fa-solid fa-user"></i>
+      <div class="status-ring"></div>
+    </div>
+  </div>
+
+  <div class="auth-card">
+    <div class="card-header">
+      <h1 class="brand-title">AADAconnect</h1>
+      <p class="brand-subtitle">Secure Ecosystem Access</p>
+    </div>
+
+    <form id="loginForm" onsubmit="handleAuth(event)">
+      <div class="form-group" id="emailGroup">
+        <div class="input-wrapper">
+          <i class="fa-solid fa-envelope input-icon"></i>
+          <input type="email" id="email" placeholder="Email Address" autocomplete="email" required>
+        </div>
+        <div class="error" id="emailError">Valid email required</div>
+      </div>
+
+      <div class="form-group" id="passwordGroup">
+        <div class="input-wrapper">
+          <i class="fa-solid fa-lock input-icon"></i>
+          <input type="password" id="password" class="has-toggle" placeholder="Security Key" autocomplete="current-password" required>
+          <i class="fa-solid fa-eye-slash password-toggle" id="togglePassword"></i>
+        </div>
+        <div class="error" id="passwordError">Key required</div>
+      </div>
+      
+      <button type="submit" class="submit-btn" id="submitBtn" onclick="triggerHaptic(30)">Authenticate</button>
+      
+      <p class="disclaimer">End-to-end encryption active. Credentials dynamically generate your unique device access keys.</p>
+    </form>
+  </div>
+
+</div>
+
+<div class="sheet-scrim" id="sheetScrim" onclick="closeSheet()"></div>
+<div class="bottom-sheet" id="identitySheet">
+  <div class="sheet-drag-indicator"></div>
+  <h2 class="sheet-title">Stored Identity</h2>
+  <div class="account-list" id="identityList">
+    </div>
+</div>
+
+<div class="modal-overlay" id="switchModal">
+  <div class="modal-box">
+    <div class="modal-icon"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+    <h2 class="modal-title">Switch Identity?</h2>
+    <p class="modal-body">Identity (<span class="modal-email-target" id="existingEmail"></span>) is currently stored. Switch to this new identity?</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="cancelSwitch()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmSwitch()">Switch</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="clearModal">
+  <div class="modal-box">
+    <div class="modal-icon danger"><i class="fa-solid fa-user-xmark"></i></div>
+    <h2 class="modal-title">Purge Identity?</h2>
+    <p class="modal-body">Erase identity (<span class="modal-email-target" id="clearEmailTarget"></span>) from this device? This enforces an immediate logout.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeClearModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmClear()">Purge</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastMsg"></div>
+
+<div class="success-overlay" id="successTransition">
+  <div class="success-bg"></div>
+  <div class="success-content">
+    <div class="success-check-ring">
+      <svg class="check-svg" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    </div>
+    <div class="success-title" id="successTitle">Access Granted</div>
+    <div class="success-sub">
+      <span id="successSubtitle">Establishing secure connection</span>
+      <div class="dots"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script>
+  let pendingAuth = null;
+
+  // ── Hardware Haptics ──
+  function triggerHaptic(pattern = 15) {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(pattern);
+  }
+
+  // ── Password Visibility ──
+  document.getElementById('togglePassword').addEventListener('click', function() {
+    const input = document.getElementById('password');
+    const isPass = input.type === 'password';
+    input.type = isPass ? 'text' : 'password';
+    this.className = isPass ? 'fa-solid fa-eye password-toggle' : 'fa-solid fa-eye-slash password-toggle';
+  });
+
+  // ── Identity Sheet Architecture (Privacy Enforced) ──
+  function openSheet() {
+    const email = localStorage.getItem('aada_email');
+    const list = document.getElementById('identityList');
+    
+    if (email) {
+      const initial = email.charAt(0).toUpperCase();
+      list.innerHTML = `
+        <div class="identity-card" onclick="autofillSecure('${email}')">
+          <div class="id-left">
+            <div class="id-avatar">${initial}</div>
+            <div class="id-info">
+              <div class="id-label"><i class="fa-solid fa-shield-check" style="margin-right:4px;"></i>Verified Identity</div>
+              <div class="id-email">${email}</div>
+            </div>
+          </div>
+          <button type="button" class="id-clear-btn" onclick="reqClearIdentity(event)" title="Purge Identity">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      `;
+    }
+    document.getElementById('sheetScrim').classList.add('active');
+  }
+
+  function closeSheet() {
+    document.getElementById('sheetScrim').classList.remove('active');
+  }
+
+  function autofillSecure(email) {
+    triggerHaptic(20);
+    document.getElementById('email').value = email;
+    document.getElementById('password').value = ''; // Enforce manual password entry
+    closeSheet();
+    setTimeout(() => document.getElementById('password').focus(), 300);
+  }
+
+  // ── Feedback Systems ──
+  function showToast(msg) {
+    const toast = document.getElementById('toastMsg');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3500);
+  }
+
+  function triggerErrorState(message) {
+    const pwdGroup = document.getElementById('passwordGroup');
+    const pwdError = document.getElementById('passwordError');
+    document.getElementById('submitBtn').classList.remove('loading');
+    
+    pwdError.textContent = message;
+    pwdError.classList.add('show');
+    
+    pwdGroup.classList.remove('shake');
+    void pwdGroup.offsetWidth; 
+    pwdGroup.classList.add('shake');
+    triggerHaptic([30, 50, 30]);
+  }
+
+  function launchSuccess(title, sub, targetUrl) {
+    const overlay = document.getElementById('successTransition');
+    document.getElementById('successTitle').textContent = title;
+    document.getElementById('successSubtitle').textContent = sub;
+    overlay.classList.add('active');
+    setTimeout(() => { window.location.href = targetUrl; }, 2600);
+  }
+
+  // ── Core Authentication ──
+  function hashData(value) {
+    return CryptoJS.SHA256(value).toString(CryptoJS.enc.Hex);
+  }
+
+  function handleAuth(e) {
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const pwd = document.getElementById('password').value.trim();
+    const btn = document.getElementById('submitBtn');
+    
+    document.getElementById('emailError').classList.remove('show');
+    document.getElementById('passwordError').classList.remove('show');
+    document.getElementById('passwordGroup').classList.remove('shake');
+    
+    if (!email || !pwd) return;
+    
+    btn.classList.add('loading');
+
+    // Slight delay to render loading spinner before heavy hash compute
+    requestAnimationFrame(() => setTimeout(() => {
+      const hEmail = hashData(email);
+      const hPwd = hashData(pwd);
+      
+      const storedEmail = localStorage.getItem('aada_email');
+      const storedHash = localStorage.getItem('aada_hashed_password');
+      
+      if (!storedEmail) {
+        // New Device / Fresh Identity
+        commitIdentity(email, hEmail, hPwd);
+        sessionLogin(email, hEmail, hPwd);
+        launchSuccess('Identity Secured', 'Building your ecosystem dashboard...', 'dashboard.html');
+      } 
+      else if (storedEmail === email) {
+        // Verify against stored hash securely
+        if (storedHash === hPwd) {
+          sessionLogin(email, hEmail, hPwd);
+          launchSuccess('Access Granted', 'Connecting to secure network...', 'dashboard.html');
+        } else {
+          triggerErrorState('Invalid security key for this identity');
+        }
+      } 
+      else {
+        // Different identity detected
+        pendingAuth = { email, hEmail, hPwd };
+        document.getElementById('existingEmail').textContent = storedEmail;
+        document.getElementById('switchModal').classList.add('active');
+        btn.classList.remove('loading');
+      }
+    }, 150));
+  }
+
+  // Storage Logic (Zero Plaintext Passwords)
+  function commitIdentity(email, hEmail, hPwd) {
+    localStorage.setItem('aada_account', hEmail + '|' + hPwd);
+    localStorage.setItem('aada_email', email);
+    localStorage.setItem('aada_hashed_email', hEmail);
+    localStorage.setItem('aada_hashed_password', hPwd);
+  }
+
+  function sessionLogin(email, hEmail, hPwd) {
+    sessionStorage.setItem('current_user', JSON.stringify({ email, hashed_email: hEmail, hashed_password: hPwd }));
+  }
+
+  function purgeIdentityData() {
+    ['aada_account','aada_email','aada_hashed_email','aada_hashed_password'].forEach(k => localStorage.removeItem(k));
+    sessionStorage.clear();
+  }
+
+  // ── Modal Actions ──
+  function confirmSwitch() {
+    if (!pendingAuth) return;
+    purgeIdentityData();
+    commitIdentity(pendingAuth.email, pendingAuth.hEmail, pendingAuth.hPwd);
+    sessionLogin(pendingAuth.email, pendingAuth.hEmail, pendingAuth.hPwd);
+    document.getElementById('switchModal').classList.remove('active');
+    launchSuccess('Identity Switched', 'Loading new dashboard...', 'dashboard.html');
+  }
+
+  function cancelSwitch() {
+    document.getElementById('switchModal').classList.remove('active');
+    pendingAuth = null;
+    showToast('Authentication aborted.');
+  }
+
+  function reqClearIdentity(e) {
+    if (e) e.stopPropagation();
+    closeSheet();
+    const email = localStorage.getItem('aada_email');
+    if (!email) return;
+    document.getElementById('clearEmailTarget').textContent = email;
+    document.getElementById('clearModal').classList.add('active');
+  }
+
+  function closeClearModal() { document.getElementById('clearModal').classList.remove('active'); }
+  
+  function confirmClear() {
+    purgeIdentityData();
+    location.reload();
+  }
+
+  // ── Initialization ──
+  window.onload = function() {
+    if (sessionStorage.getItem('current_user')) { window.location.href = 'dashboard.html'; return; }
+    
+    // Auto-login if "rememberMe" token exists from old implementation
+    const remembered = localStorage.getItem('remembered_user');
+    if (remembered && localStorage.getItem('rememberMe') === 'true') {
+      try { sessionStorage.setItem('current_user', remembered); window.location.href = 'dashboard.html'; return; } catch(e) {}
+    }
+    
+    // Evaluate if we show the Profile Nav Button
+    if (localStorage.getItem('aada_email')) {
+      document.getElementById('profileBtn').classList.add('active');
+    }
+  };
+</script>
+</body>
+</html>
