@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AADAconnect | Secure Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --radius-pill: 100px;
+      --radius-xl: 32px;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    [data-theme="light"] {
+      --bg: #F4F4F8;
+      --surface-glass: rgba(255, 255, 255, 0.75);
+      --surface-input: rgba(255, 255, 255, 0.5);
+      --text-primary: #000000;
+      --text-secondary: #6B6B70;
+      --border-glass: rgba(0, 0, 0, 0.08);
+      --border-strong: rgba(0, 0, 0, 0.15);
+      --active-blue: #0A84FF;
+      --danger: #FF3B30;
+      --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.06);
+      --shadow-heavy: 0 24px 48px rgba(0, 0, 0, 0.12);
+      --mesh-1: rgba(255, 149, 0, 0.15);
+      --mesh-2: rgba(10, 132, 255, 0.15);
+      --mesh-3: rgba(191, 90, 242, 0.12);
+    }
+
+    [data-theme="dark"] {
+      --bg: #030305;
+      --surface-glass: rgba(20, 20, 22, 0.65);
+      --surface-input: rgba(255, 255, 255, 0.03);
+      --text-primary: #FFFFFF;
+      --text-secondary: #8E8E93;
+      --border-glass: rgba(255, 255, 255, 0.1);
+      --border-strong: rgba(255, 255, 255, 0.18);
+      --active-blue: #0A84FF;
+      --danger: #FF453A;
+      --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.4);
+      --shadow-heavy: 0 24px 48px rgba(0, 0, 0, 0.6);
+      --mesh-1: rgba(255, 159, 10, 0.2);
+      --mesh-2: rgba(10, 132, 255, 0.25);
+      --mesh-3: rgba(191, 90, 242, 0.2);
+    }
+
+    html, body { height: 100%; font-family: 'Inter', sans-serif; color: var(--text-primary); }
+    body {
+      background: var(--bg); display: flex; justify-content: center;
+      min-height: 100dvh; overflow: hidden; transition: background 0.4s ease; margin: 0;
+    }
+
+    /* ── App Container ── */
+    .app-container {
+      position: relative; width: 100%; max-width: 430px; 
+      height: 100dvh; display: flex; flex-direction: column;
+      background: var(--bg); overflow: hidden;
+    }
+
+    /* ── Cinematic Mesh Background ── */
+    .ambient-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+    .mesh-blob { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.9; mix-blend-mode: screen; }
+    .blob-1 { top: -5%; left: -20%; width: 350px; height: 350px; background: var(--mesh-1); animation: drift 20s ease-in-out infinite alternate; }
+    .blob-2 { top: 20%; right: -20%; width: 400px; height: 400px; background: var(--mesh-2); animation: drift 24s ease-in-out infinite alternate-reverse; }
+    .blob-3 { top: 50%; left: 10%; width: 300px; height: 300px; background: var(--mesh-3); animation: drift 28s ease-in-out infinite alternate; }
+    @keyframes drift { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(40px, 50px) scale(1.15); } }
+
+    /* ── Top Nav ── */
+    .top-nav {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 30;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: calc(env(safe-area-inset-top, 20px) + 16px) 24px 0;
+    }
+    .brand-mark {
+      display: flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: 14px;
+      background: var(--surface-glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border-glass); color: var(--text-primary); font-size: 20px;
+      box-shadow: var(--shadow-soft), inset 0 1px 1px rgba(255,255,255,0.15);
+    }
+    .profile-btn {
+      position: relative; width: 44px; height: 44px; border-radius: 50%;
+      background: var(--surface-glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border-glass); display: flex; align-items: center; justify-content: center;
+      color: var(--text-primary); font-size: 16px; cursor: pointer;
+      box-shadow: var(--shadow-soft), inset 0 1px 1px rgba(255,255,255,0.15); transition: var(--transition);
+      opacity: 0; pointer-events: none; transform: scale(0.8);
+    }
+    .profile-btn.visible { opacity: 1; pointer-events: auto; transform: scale(1); }
+    .profile-btn:active { transform: scale(0.9); }
+    .profile-dot {
+      position: absolute; top: 2px; right: 2px; width: 10px; height: 10px; border-radius: 50%;
+      background: #30D158; border: 2px solid var(--bg); box-shadow: 0 0 8px rgba(48, 209, 88, 0.6);
+    }
+
+    /* ── 3D Isometric Orbital System ── */
+    .orbit-scene {
+      position: relative; z-index: 10; flex: 1; 
+      display: flex; align-items: center; justify-content: center;
+      min-height: 380px; perspective: 1200px;
+      margin-top: 20px;
+    }
+    
+    .orbit-world {
+      position: relative; width: 0; height: 0;
+      /* Tilt the plane 65 degrees to create the 3D isometric floor */
+      transform: rotateX(65deg);
+      transform-style: preserve-3d;
+    }
+
+    /* Track Rings */
+    .orbit-track {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 24px rgba(10, 132, 255, 0.05), inset 0 0 24px rgba(10, 132, 255, 0.05);
+    }
+    [data-theme="light"] .orbit-track { border-color: rgba(0, 0, 0, 0.06); }
+    .track-1 { width: 170px; height: 170px; }
+    .track-2 { width: 290px; height: 290px; }
+
+    /* Glowing Core Hub */
+    .orbit-hub {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotateX(-65deg);
+      width: 64px; height: 64px; border-radius: 50%;
+      background: linear-gradient(135deg, #1C1C1E, #2C2C2E);
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex; align-items: center; justify-content: center;
+      color: #FFF; font-size: 26px; z-index: 5;
+      box-shadow: 0 16px 32px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.2), 0 0 40px rgba(10, 132, 255, 0.3);
+    }
+    [data-theme="light"] .orbit-hub {
+      background: linear-gradient(135deg, #FFFFFF, #F0F0F5); border-color: rgba(0,0,0,0.1); color: #000;
+      box-shadow: 0 16px 32px rgba(0,0,0,0.1), 0 0 40px rgba(10, 132, 255, 0.2);
+    }
+
+    /* Magic Counter-Rotating Nodes */
+    .orbit-node {
+      position: absolute; top: 0; left: 0;
+      /* Mathematically keeps the icon standing up while orbiting a tilted plane */
+      animation: orbit linear infinite;
+    }
+    
+    @keyframes orbit-cw {
+      0% { transform: rotateZ(0deg) translateX(var(--r)) rotateZ(0deg) rotateX(-65deg); }
+      100% { transform: rotateZ(360deg) translateX(var(--r)) rotateZ(-360deg) rotateX(-65deg); }
+    }
+    @keyframes orbit-ccw {
+      0% { transform: rotateZ(360deg) translateX(var(--r)) rotateZ(-360deg) rotateX(-65deg); }
+      100% { transform: rotateZ(0deg) translateX(var(--r)) rotateZ(0deg) rotateX(-65deg); }
+    }
+
+    /* Floating Node Content */
+    .node-content {
+      position: absolute; top: -24px; left: -24px; width: 48px; height: 48px;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: #FFF;
+      box-shadow: var(--shadow-soft), inset 0 2px 2px rgba(255,255,255,0.3);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    /* Node Radii & Timings */
+    .node-1 { --r: 85px; animation: orbit-cw 20s linear infinite; animation-delay: 0s; }
+    .node-2 { --r: 85px; animation: orbit-cw 20s linear infinite; animation-delay: -6.6s; }
+    .node-3 { --r: 85px; animation: orbit-cw 20s linear infinite; animation-delay: -13.3s; }
+    
+    .node-4 { --r: 145px; animation: orbit-ccw 35s linear infinite; animation-delay: 0s; }
+    .node-5 { --r: 145px; animation: orbit-ccw 35s linear infinite; animation-delay: -8.75s; }
+    .node-6 { --r: 145px; animation: orbit-ccw 35s linear infinite; animation-delay: -17.5s; }
+    .node-7 { --r: 145px; animation: orbit-ccw 35s linear infinite; animation-delay: -26.25s; }
+
+    /* Node Colors */
+    .n-bulb   { background: linear-gradient(135deg, #FFD60A, #FF9F0A); }
+    .n-temp   { background: linear-gradient(135deg, #FF453A, #FF375F); }
+    .n-lock   { background: linear-gradient(135deg, #30D158, #34C759); }
+    .n-router { background: linear-gradient(135deg, #5E5CE6, #BF5AF2); }
+    .n-fan    { background: linear-gradient(135deg, #64D2FF, #0A84FF); }
+    .n-shield { background: linear-gradient(135deg, #FF375F, #BF5AF2); }
+    .n-cam    { background: linear-gradient(135deg, #FF9F0A, #FF453A); }
+
+
+    /* ── Floating Glassmorphic Auth Card ── */
+    .auth-island {
+      position: relative; z-index: 20; flex-shrink: 0;
+      margin: 0 16px calc(env(safe-area-inset-bottom, 16px) + 16px);
+      background: var(--surface-glass);
+      backdrop-filter: blur(40px) saturate(150%); -webkit-backdrop-filter: blur(40px) saturate(150%);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-xl);
+      padding: 32px 24px;
+      box-shadow: var(--shadow-heavy), inset 0 1px 1px rgba(255,255,255,0.15);
+      animation: floatUp 0.8s cubic-bezier(0.25, 1, 0.5, 1) both;
+    }
+    @keyframes floatUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+    .card-header { text-align: center; margin-bottom: 28px; }
+    .hero-title {
+      font-size: 26px; font-weight: 800; letter-spacing: -0.6px; line-height: 1.1;
+      color: var(--text-primary); margin-bottom: 6px;
+    }
+    .hero-subtitle {
+      font-size: 15px; font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    /* ── Floating Inputs ── */
+    .form-group { margin-bottom: 16px; position: relative; }
+    .input-wrapper { position: relative; }
+    .input-icon {
+      position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
+      font-size: 16px; color: var(--text-secondary); pointer-events: none;
+    }
+    .password-toggle {
+      position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+      font-size: 16px; color: var(--text-secondary); cursor: pointer; padding: 4px; z-index: 10;
+    }
+
+    input {
+      width: 100%; padding: 18px 20px 18px 52px;
+      background: var(--surface-input); 
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg); color: var(--text-primary);
+      font-size: 15px; font-weight: 500; font-family: 'Inter', sans-serif; outline: none;
+      transition: all 0.3s;
+    }
+    input.has-toggle { padding-right: 50px; }
+    input:focus {
+      border-color: var(--active-blue); 
+      background: rgba(10, 132, 255, 0.05);
+      box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.15);
+    }
+    input::placeholder { color: var(--text-secondary); font-weight: 400; }
+
+    .error {
+      color: var(--danger); font-size: 13px; margin-top: 8px; padding-left: 16px;
+      font-weight: 600; display: none; animation: popIn 0.2s ease;
+    }
+    .error.show { display: block; }
+    @keyframes popIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    .form-group.shake { animation: shake 0.35s ease-in-out; }
+    .form-group.shake input { border-color: var(--danger); background: var(--danger-dim); }
+
+    /* ── App-Style Glossy Button ── */
+    .submit-btn {
+      width: 100%; padding: 18px; margin-top: 8px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%), var(--active-blue);
+      color: #FFF; border: none; border-radius: var(--radius-pill);
+      font-weight: 700; font-size: 16px; font-family: 'Inter', sans-serif;
+      cursor: pointer; letter-spacing: -0.2px; transition: var(--transition);
+      position: relative; overflow: hidden;
+      box-shadow: 0 8px 24px rgba(10, 132, 255, 0.4), inset 0 1px 1px rgba(255,255,255,0.3);
+    }
+    .submit-btn:active { transform: scale(0.96); opacity: 0.9; box-shadow: 0 4px 12px rgba(10, 132, 255, 0.3); }
+    .submit-btn.loading { pointer-events: none; color: transparent !important; }
+    .submit-btn.loading::after {
+      content: ''; position: absolute; inset: 0; margin: auto; width: 22px; height: 22px;
+      border: 2.5px solid transparent; border-top-color: #FFF; border-right-color: #FFF;
+      border-radius: 50%; animation: btnSpin 0.65s linear infinite;
+    }
+    @keyframes btnSpin { to { transform: rotate(360deg); } }
+
+    .info-text {
+      text-align: center; color: var(--text-secondary); font-size: 12px; font-weight: 500; line-height: 1.5; margin-top: 20px;
+    }
+
+    /* ── Accounts Modal / Overlays (Matching Glassmorphism) ── */
+    .sheet-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+    }
+    .sheet-overlay.active { opacity: 1; pointer-events: auto; }
+
+    /* The accounts list is now a floating island too */
+    .accounts-sheet {
+      position: fixed; bottom: calc(env(safe-area-inset-bottom, 16px) + 16px); left: 16px; right: 16px; z-index: 1001;
+      background: var(--surface-glass); backdrop-filter: blur(40px) saturate(150%); -webkit-backdrop-filter: blur(40px) saturate(150%);
+      border: 1px solid var(--border-glass); border-radius: var(--radius-xl);
+      padding: 24px; transform: translateY(150%); transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+      box-shadow: var(--shadow-heavy), inset 0 1px 1px rgba(255,255,255,0.15); display: flex; flex-direction: column; max-height: 80dvh;
+    }
+    .sheet-overlay.active + .accounts-sheet { transform: translateY(0); }
+
+    .sheet-handle { width: 44px; height: 5px; background: var(--border-strong); border-radius: 3px; margin: 0 auto 20px; }
+    .sheet-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: var(--text-primary); margin-bottom: 20px; text-align: center; }
+
+    .account-list { overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+    
+    .account-item {
+      background: var(--surface-input); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg); padding: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      transition: var(--transition); cursor: pointer;
+    }
+    .account-item:active { transform: scale(0.96); background: rgba(10, 132, 255, 0.1); border-color: rgba(10, 132, 255, 0.3); }
+    .account-item-left { display: flex; align-items: center; gap: 14px; }
+    .account-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: linear-gradient(135deg, #64D2FF, #0A84FF); color: #FFF;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700; box-shadow: 0 4px 12px rgba(10, 132, 255, 0.3);
+    }
+    .account-details { text-align: left; }
+    .account-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 2px; }
+    .account-email { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    
+    .account-delete-btn {
+      width: 36px; height: 36px; border-radius: 50%; background: var(--surface-input);
+      border: 1px solid var(--border-strong); color: var(--text-secondary);
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+      cursor: pointer; transition: var(--transition);
+    }
+    .account-delete-btn:active { transform: scale(0.9); background: var(--danger-dim); color: var(--danger); border-color: rgba(255,69,58,0.3); }
+
+    /* ── Modals (Clear/Switch) ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      display: none; align-items: flex-end; justify-content: center; z-index: 2000;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-content {
+      background: var(--surface-glass); backdrop-filter: blur(40px) saturate(150%); -webkit-backdrop-filter: blur(40px) saturate(150%);
+      border: 1px solid var(--border-glass); margin: 16px; bottom: env(safe-area-inset-bottom, 16px); position: relative;
+      border-radius: var(--radius-xl); padding: 24px;
+      width: calc(100% - 32px); max-width: 400px; transform: translateY(150%); transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+      box-shadow: var(--shadow-heavy), inset 0 1px 1px rgba(255,255,255,0.15);
+    }
+    .modal-overlay.active .modal-content { transform: translateY(0); }
+    .modal-icon { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 16px; background: var(--surface-input); border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--text-primary); }
+    .modal-icon.danger-icon { color: var(--danger); background: var(--danger-dim); border-color: rgba(255,69,58,0.3); }
+    .modal-title { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 8px; color: var(--text-primary); text-align: center; }
+    .modal-message { color: var(--text-secondary); line-height: 1.5; margin-bottom: 24px; font-size: 14px; font-weight: 500; text-align: center; }
+    .modal-email { color: var(--text-primary); font-weight: 700; word-break: break-all; }
+    .modal-buttons { display: flex; gap: 12px; }
+    .modal-btn { flex: 1; padding: 16px; border: none; border-radius: var(--radius-lg); font-weight: 700; font-size: 15px; cursor: pointer; font-family: 'Inter', sans-serif; transition: var(--transition); }
+    .modal-btn:active { transform: scale(0.96); }
+    .modal-btn-primary { background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%), var(--active-blue); color: #FFF; box-shadow: inset 0 1px 1px rgba(255,255,255,0.3); }
+    .modal-btn-danger { background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%), var(--danger); color: #FFF; box-shadow: inset 0 1px 1px rgba(255,255,255,0.3); }
+    .modal-btn-secondary { background: var(--surface-input); color: var(--text-primary); border: 1px solid var(--border-strong); }
+
+    /* ── Toast Notification ── */
+    .toast-notification {
+      position: fixed; top: calc(env(safe-area-inset-top, 20px) + 20px); left: 50%; transform: translateX(-50%) translateY(-150%);
+      background: var(--surface-glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      color: var(--text-primary); padding: 14px 24px; border-radius: var(--radius-pill); border: 1px solid var(--border-glass);
+      font-size: 13px; font-weight: 600; box-shadow: var(--shadow-heavy);
+      opacity: 0; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); z-index: 10000; pointer-events: none; white-space: nowrap;
+    }
+    .toast-notification.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    /* ── Premium Success Transition ── */
+    .premium-transition {
+      position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .premium-bg-secondary {
+      position: absolute; inset: 0; background: var(--surface-glass); backdrop-filter: blur(40px);
+      clip-path: circle(0% at 50% 50%); transition: clip-path 0.7s cubic-bezier(0.76, 0, 0.24, 1);
+    }
+    .premium-bg-primary {
+      position: absolute; inset: 0; background: var(--bg);
+      clip-path: circle(0% at 50% 50%); transition: clip-path 0.9s cubic-bezier(0.76, 0, 0.24, 1) 0.1s;
+    }
+    .premium-transition.active .premium-bg-secondary { clip-path: circle(150% at 50% 50%); }
+    .premium-transition.active .premium-bg-primary   { clip-path: circle(150% at 50% 50%); }
+    .premium-content {
+      position: relative; z-index: 10000; text-align: center; opacity: 0;
+      transform: scale(0.9) translateY(15px); transition: opacity 0.6s ease 0.5s, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s;
+    }
+    .premium-transition.active .premium-content { opacity: 1; transform: scale(1) translateY(0); }
+    .premium-icon-wrapper {
+      width: 80px; height: 80px; margin: 0 auto 24px;
+      background: var(--surface-glass); border: 1px solid var(--border-glass);
+      border-radius: 50%; box-shadow: var(--shadow-heavy);
+      display: flex; align-items: center; justify-content: center; position: relative;
+    }
+    .premium-icon-wrapper::after, .premium-icon-wrapper::before {
+      content: ''; position: absolute; inset: -1px; border-radius: 50%; border: 1.5px solid var(--active-blue); opacity: 0;
+    }
+    .premium-transition.active .premium-icon-wrapper::before { animation: pulseRing 1.5s cubic-bezier(0.21, 0.53, 0.56, 1) 0.6s forwards; }
+    .premium-transition.active .premium-icon-wrapper::after { animation: pulseRing 1.5s cubic-bezier(0.21, 0.53, 0.56, 1) 0.9s forwards; }
+    @keyframes pulseRing { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.6); opacity: 0; } }
+    .premium-check { width: 34px; height: 34px; stroke: var(--text-primary); stroke-dasharray: 60; stroke-dashoffset: 60; }
+    .premium-transition.active .premium-check { animation: drawCheck 0.5s cubic-bezier(0.25, 1, 0.5, 1) 0.8s forwards; }
+    @keyframes drawCheck { to { stroke-dashoffset: 0; } }
+    .premium-title { font-size: 28px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.8px; margin-bottom: 10px; }
+    .premium-subtitle { font-size: 14px; font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .premium-loader-dots { display: inline-flex; gap: 4px; margin-top: 4px; }
+    .premium-loader-dots span { width: 4px; height: 4px; border-radius: 50%; background: var(--active-blue); animation: bounceDot 1.4s infinite ease-in-out both; }
+    .premium-loader-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .premium-loader-dots span:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes bounceDot { 0%, 80%, 100% { transform: scale(0); opacity: 0.3; } 40% { transform: scale(1); opacity: 1; } }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <div class="ambient-bg">
+    <div class="mesh-blob blob-1"></div>
+    <div class="mesh-blob blob-2"></div>
+    <div class="mesh-blob blob-3"></div>
+  </div>
+
+  <div class="top-nav">
+    <div class="brand-mark"><i class="fa-solid fa-plug-circle-bolt"></i></div>
+    <div class="profile-btn" id="profileBtn" onclick="openAccountsSheet(); triggerHaptic(15);" title="Saved Accounts">
+      <i class="fa-solid fa-user"></i>
+      <div class="profile-dot"></div>
+    </div>
+  </div>
+
+  <div class="orbit-scene">
+    <div class="orbit-world">
+      <div class="orbit-track track-1"></div>
+      <div class="orbit-track track-2"></div>
+      
+      <div class="orbit-hub"><i class="fa-solid fa-house-signal"></i></div>
+      
+      <div class="orbit-node node-1"><div class="node-content n-bulb"><i class="fa-solid fa-lightbulb"></i></div></div>
+      <div class="orbit-node node-2"><div class="node-content n-temp"><i class="fa-solid fa-temperature-half"></i></div></div>
+      <div class="orbit-node node-3"><div class="node-content n-lock"><i class="fa-solid fa-lock"></i></div></div>
+      
+      <div class="orbit-node node-4"><div class="node-content n-router"><i class="fa-solid fa-router"></i></div></div>
+      <div class="orbit-node node-5"><div class="node-content n-fan"><i class="fa-solid fa-fan"></i></div></div>
+      <div class="orbit-node node-6"><div class="node-content n-shield"><i class="fa-solid fa-shield-halved"></i></div></div>
+      <div class="orbit-node node-7"><div class="node-content n-cam"><i class="fa-solid fa-video"></i></div></div>
+    </div>
+  </div>
+
+  <div class="auth-island">
+    <div class="card-header">
+      <h1 class="hero-title">AADAconnect</h1>
+      <p class="hero-subtitle">Secure access to your ecosystem</p>
+    </div>
+
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <div class="form-group" id="emailGroup">
+        <div class="input-wrapper">
+          <i class="fa-solid fa-envelope input-icon"></i>
+          <input type="email" id="email" class="no-right-icon" placeholder="Email Address" autocomplete="email" required>
+        </div>
+        <div class="error" id="emailError">Please enter a valid email</div>
+      </div>
+
+      <div class="form-group" id="passwordGroup">
+        <div class="input-wrapper">
+          <i class="fa-solid fa-lock input-icon"></i>
+          <input type="password" id="password" class="has-toggle" placeholder="Password" autocomplete="current-password" required>
+          <i class="fa-solid fa-eye-slash password-toggle" id="togglePassword"></i>
+        </div>
+        <div class="error" id="passwordError">Please enter a password</div>
+      </div>
+      
+      <div class="error" id="loginError"></div>
+      <button type="submit" class="submit-btn" id="submitBtn" onclick="triggerHaptic(30)">Continue</button>
+      
+      <p class="info-text" id="infoText">Your credentials dynamically generate a secure access key to your devices.</p>
+    </form>
+  </div>
+
+</div>
+
+<div class="sheet-overlay" id="sheetOverlay" onclick="closeAccountsSheet()"></div>
+<div class="accounts-sheet" id="accountsSheet">
+  <div class="sheet-handle"></div>
+  <h2 class="sheet-title">Saved Account</h2>
+  <div class="account-list" id="accountList">
+    </div>
+</div>
+
+<div class="modal-overlay" id="switchModal">
+  <div class="modal-content">
+    <div class="modal-icon"><i class="fa-solid fa-users"></i></div>
+    <h2 class="modal-title">Switch Account?</h2>
+    <p class="modal-message">An account (<span class="modal-email" id="existingEmail"></span>) is already saved. Switch to the new account?</p>
+    <div class="modal-buttons">
+      <button class="modal-btn modal-btn-secondary" onclick="cancelSwitch()">Cancel</button>
+      <button class="modal-btn modal-btn-primary" onclick="confirmSwitch()">Switch</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="clearModal">
+  <div class="modal-content">
+    <div class="modal-icon danger-icon"><i class="fa-solid fa-user-xmark"></i></div>
+    <h2 class="modal-title">Clear Account?</h2>
+    <p class="modal-message">Clear the saved account (<span class="modal-email" id="clearEmailTarget"></span>)? This will immediately log you out.</p>
+    <div class="modal-buttons">
+      <button class="modal-btn modal-btn-secondary" onclick="closeClearModal()">Cancel</button>
+      <button class="modal-btn modal-btn-danger" onclick="confirmClearAccount()">Clear</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-notification" id="toastNotification"></div>
+
+<div class="premium-transition" id="premiumTransition">
+  <div class="premium-bg-secondary"></div>
+  <div class="premium-bg-primary"></div>
+  <div class="premium-content">
+    <div class="premium-icon-wrapper">
+      <svg class="premium-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    </div>
+    <div class="premium-title" id="premiumTitle">Welcome back</div>
+    <div class="premium-subtitle">
+      <span id="premiumSubtitleText">Taking you to your dashboard</span>
+      <div class="premium-loader-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script>
+  let pendingAccount = null;
+
+  function initTheme() {
+    const saved = localStorage.getItem('appTheme') || localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  }
+
+  // Helper for Haptic Feedback
+  function triggerHaptic(duration = 15) {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(duration);
+    }
+  }
+
+  // Password Visibility Toggle
+  document.getElementById('togglePassword').addEventListener('click', function() {
+    const input = document.getElementById('password');
+    const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+    input.setAttribute('type', type);
+    if (type === 'text') {
+      this.classList.remove('fa-eye-slash');
+      this.classList.add('fa-eye');
+    } else {
+      this.classList.remove('fa-eye');
+      this.classList.add('fa-eye-slash');
+    }
+  });
+
+  // ── Account Sheet Logic & Privacy Upgrades ───────────────────────────
+  function openAccountsSheet() {
+    const savedEmail = localStorage.getItem('aada_email');
+    const list = document.getElementById('accountList');
+    
+    if (savedEmail) {
+      const initial = savedEmail.charAt(0).toUpperCase();
+      // SECURITY FIX: Auto-filling securely focuses the password box.
+      list.innerHTML = `
+        <div class="account-item" onclick="autoFillSecurely('${savedEmail}')">
+          <div class="account-item-left">
+            <div class="account-avatar">${initial}</div>
+            <div class="account-details">
+              <div class="account-label">Saved Identity</div>
+              <div class="account-email">${savedEmail}</div>
+            </div>
+          </div>
+          <button type="button" class="account-delete-btn" onclick="triggerClearAccount(event)" title="Clear Account">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      `;
+    } else {
+      list.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-secondary); font-size: 14px;">No saved accounts</div>`;
+    }
+
+    document.getElementById('sheetOverlay').classList.add('active');
+  }
+
+  function closeAccountsSheet() {
+    document.getElementById('sheetOverlay').classList.remove('active');
+  }
+
+  // PRIVACY UPGRADE: Fills email, clears password, and requires manual verification.
+  function autoFillSecurely(email) {
+    triggerHaptic(20);
+    document.getElementById('email').value = email;
+    document.getElementById('password').value = ''; 
+    closeAccountsSheet();
+    
+    // Focus password field, forcing explicit authentication
+    setTimeout(() => {
+      document.getElementById('password').focus();
+    }, 300);
+  }
+
+  // ── Show Toast Notification ───────────────────────────────────────────
+  function showToast(message) {
+    const toast = document.getElementById('toastNotification');
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  // ── Animated Premium Transition ───────────────────────────────────────
+  function showSuccessTransition(title, subtitle, href) {
+    const transition = document.getElementById('premiumTransition');
+    document.getElementById('premiumTitle').textContent = title;
+    document.getElementById('premiumSubtitleText').textContent = subtitle;
+
+    transition.classList.add('active');
+    setTimeout(() => { window.location.href = href; }, 2500);
+  }
+
+  function hashValue(value) {
+    return CryptoJS.SHA256(value).toString(CryptoJS.enc.Hex);
+  }
+
+  function triggerPasswordError(message) {
+    const pwdGroup = document.getElementById('passwordGroup');
+    const pwdError = document.getElementById('passwordError');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    submitBtn.classList.remove('loading');
+    pwdError.textContent = message;
+    pwdError.classList.add('show');
+    
+    // Native shake animation for invalid inputs
+    pwdGroup.classList.remove('shake');
+    void pwdGroup.offsetWidth; // Force reflow
+    pwdGroup.classList.add('shake');
+    triggerHaptic([30, 50, 30]); // Error haptic pattern
+  }
+
+  function handleLogin(event) {
+    event.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value.trim();
+    const emailError = document.getElementById('emailError');
+    const passwordError = document.getElementById('passwordError');
+    const loginError = document.getElementById('loginError');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    emailError.classList.remove('show');
+    passwordError.classList.remove('show');
+    loginError.classList.remove('show');
+    document.getElementById('passwordGroup').classList.remove('shake');
+    
+    if (!email || !password) {
+      if (!email) emailError.classList.add('show');
+      if (!password) passwordError.classList.add('show');
+      return;
+    }
+
+    submitBtn.classList.add('loading');
+
+    requestAnimationFrame(() => setTimeout(() => {
+      const hashedEmail = hashValue(email);
+      const hashedPassword = hashValue(password);
+      
+      const savedEmail = localStorage.getItem('aada_email');
+      const savedHashedPassword = localStorage.getItem('aada_hashed_password');
+      
+      if (!savedEmail) {
+        // Fresh Account Initialization
+        saveAccount(email, hashedEmail, hashedPassword);
+        loginUser(email, hashedEmail, hashedPassword);
+        showSuccessTransition('Connection Secured', 'Initializing your secure dashboard...', 'dashboard.html');
+      } 
+      else if (savedEmail === email) {
+        // SECURITY FIX: Password validation for existing account. 
+        if (savedHashedPassword === hashedPassword) {
+          loginUser(email, hashedEmail, hashedPassword);
+          showSuccessTransition('Welcome back', 'Connecting to your network...', 'dashboard.html');
+        } else {
+          // They entered the saved email but the wrong password.
+          triggerPasswordError('Incorrect password for this account');
+        }
+      } 
+      else {
+        // They entered a completely different email. Offer account switch.
+        pendingAccount = { email, hashedEmail, hashedPassword };
+        document.getElementById('existingEmail').textContent = savedEmail;
+        document.getElementById('switchModal').classList.add('active');
+        submitBtn.classList.remove('loading');
+      }
+    }, 200)); 
+  }
+
+  // PRIVACY UPGRADE: No longer storing plaintext password in local storage.
+  function saveAccount(email, hashedEmail, hashedPassword) {
+    const accountKey = hashedEmail + '|' + hashedPassword;
+    localStorage.setItem('aada_account', accountKey);
+    localStorage.setItem('aada_email', email);
+    localStorage.setItem('aada_hashed_email', hashedEmail);
+    localStorage.setItem('aada_hashed_password', hashedPassword);
+  }
+
+  function loginUser(email, hashedEmail, hashedPassword) {
+    sessionStorage.setItem('current_user', JSON.stringify({ 
+      email, 
+      hashed_email: hashedEmail, 
+      hashed_password: hashedPassword 
+    }));
+  }
+
+  function clearAllAccountData() {
+    ['aada_account','aada_email','aada_hashed_email','aada_hashed_password'].forEach(k => localStorage.removeItem(k));
+    sessionStorage.clear();
+  }
+
+  function confirmSwitch() {
+    if (!pendingAccount) return;
+    clearAllAccountData();
+    saveAccount(pendingAccount.email, pendingAccount.hashedEmail, pendingAccount.hashedPassword);
+    loginUser(pendingAccount.email, pendingAccount.hashedEmail, pendingAccount.hashedPassword);
+    document.getElementById('switchModal').classList.remove('active');
+    pendingAccount = null;
+    showSuccessTransition('Account Switched', 'Connecting to secure dashboard...', 'dashboard.html');
+  }
+
+  function cancelSwitch() {
+    document.getElementById('switchModal').classList.remove('active');
+    pendingAccount = null;
+    const loginError = document.getElementById('loginError');
+    loginError.textContent = 'Please use the saved account or clear it to create a new one';
+    loginError.classList.add('show');
+  }
+
+  function triggerClearAccount(event) {
+    if (event) event.stopPropagation(); // Prevent auto-fill if clicking delete inside sheet
+    closeAccountsSheet(); // Close sheet if it's open
+    
+    const savedEmail = localStorage.getItem('aada_email');
+    if (!savedEmail) { 
+      showToast('No account saved to clear'); 
+      return; 
+    }
+    document.getElementById('clearEmailTarget').textContent = savedEmail;
+    document.getElementById('clearModal').classList.add('active');
+  }
+
+  function closeClearModal() {
+    document.getElementById('clearModal').classList.remove('active');
+  }
+
+  function confirmClearAccount() {
+    clearAllAccountData(); 
+    location.reload();
+  }
+
+  function showAccountInfo() {
+    const savedEmail = localStorage.getItem('aada_email');
+    const profileBtn = document.getElementById('profileBtn');
+    
+    // Display the circular profile button only if an account is saved
+    if (savedEmail) {
+      profileBtn.classList.add('visible');
+    } else {
+      profileBtn.classList.remove('visible');
+    }
+  }
+
+  window.onload = function() {
+    initTheme();
+    const currentUser = sessionStorage.getItem('current_user');
+    if (currentUser) { window.location.href = 'dashboard.html'; return; }
+    
+    const remembered = localStorage.getItem('remembered_user');
+    if (remembered && localStorage.getItem('rememberMe') === 'true') {
+      try { 
+        sessionStorage.setItem('current_user', remembered); 
+        window.location.href = 'dashboard.html'; 
+        return; 
+      } catch(e) {}
+    }
+    
+    // Initialize profile button visibility
+    showAccountInfo();
+  };
+</script>
+</body>
+</html>
